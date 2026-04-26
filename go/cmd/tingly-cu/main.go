@@ -4,15 +4,19 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/tingly-dev/tingly-computer-use/go/internal/bridge"
 	"github.com/tingly-dev/tingly-computer-use/go/internal/mcpserver"
+	"github.com/tingly-dev/tingly-computer-use/go/internal/obs"
 )
 
 const version = "0.1.0"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
+		obs.Error("fatal", "error", err.Error())
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
@@ -53,9 +57,17 @@ func run(args []string) error {
 	}
 }
 
+// rootContext returns a context cancelled on SIGINT/SIGTERM so that bridge
+// teardown (mgr.Close) runs and the native child process is reaped instead
+// of being orphaned.
+func rootContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+}
+
 // withBridge starts the bridge, calls f, then closes.
 func withBridge(f func(ctx context.Context, c *bridge.Client) error) error {
-	ctx := context.Background()
+	ctx, cancel := rootContext()
+	defer cancel()
 	mgr, err := bridge.NewManager(bridge.DefaultConfig())
 	if err != nil {
 		return fmt.Errorf("init bridge: %w", err)
@@ -64,11 +76,16 @@ func withBridge(f func(ctx context.Context, c *bridge.Client) error) error {
 	if err := mgr.EnsureRunning(ctx); err != nil {
 		return fmt.Errorf("start native bridge: %w", err)
 	}
-	return f(ctx, mgr.Client())
+	client, err := mgr.Client()
+	if err != nil {
+		return err
+	}
+	return f(ctx, client)
 }
 
 func runMCP() error {
-	ctx := context.Background()
+	ctx, cancel := rootContext()
+	defer cancel()
 	mgr, err := bridge.NewManager(bridge.DefaultConfig())
 	if err != nil {
 		return fmt.Errorf("init bridge: %w", err)
@@ -78,24 +95,35 @@ func runMCP() error {
 		return fmt.Errorf("start native bridge: %w", err)
 	}
 	srv := mcpserver.New(mgr, version)
+	// Stop the MCP stdio loop as soon as a signal arrives by closing stdin.
+	go func() {
+		<-ctx.Done()
+		_ = os.Stdin.Close()
+	}()
 	return srv.ServeStdio()
 }
 
 func runDoctor() error {
-	ctx := context.Background()
+	ctx, cancel := rootContext()
+	defer cancel()
 	mgr, err := bridge.NewManager(bridge.DefaultConfig())
 	if err != nil {
 		return fmt.Errorf("init bridge: %w", err)
 	}
 	defer mgr.Close()
 	if err := mgr.EnsureRunning(ctx); err != nil {
+		obs.Warn("native bridge unavailable", "error", err.Error())
 		fmt.Fprintf(os.Stderr, "native bridge not available: %v\n", err)
 		fmt.Println("FAIL: cannot connect to tingly-cu-native")
 		return nil
 	}
-	client := mgr.Client()
+	client, err := mgr.Client()
+	if err != nil {
+		return err
+	}
 	resp, err := client.CheckPermissions(ctx)
 	if err != nil {
+		obs.Error("check permissions failed", "error", err.Error())
 		fmt.Fprintf(os.Stderr, "check permissions: %v\n", err)
 		return nil
 	}

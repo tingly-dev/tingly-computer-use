@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"math"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	pb "github.com/tingly-dev/tingly-computer-use/go/pkg/proto/computeruse/v1"
@@ -15,7 +16,9 @@ func (h *Handlers) Click(ctx context.Context, req mcp.CallToolRequest) (*mcp.Cal
 		return mcp.NewToolResultError("missing required parameter: app"), nil
 	}
 
-	pbReq := &pb.ClickRequest{App: app}
+	// NaN encodes "coordinate not provided" so that legitimate (0,0) clicks
+	// are not mistaken for the sentinel. The Swift side checks isNaN.
+	pbReq := &pb.ClickRequest{App: app, X: math.NaN(), Y: math.NaN()}
 
 	if v, ok := args["element_index"].(string); ok && v != "" {
 		pbReq.ElementIndex = v

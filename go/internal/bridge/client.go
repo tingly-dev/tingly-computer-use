@@ -68,9 +68,10 @@ func (c *Client) GetAppState(ctx context.Context, app string) (*AppStateResult, 
 		ScreenshotPNG:     resp.ScreenshotPng,
 		ScreenshotB64:     base64.StdEncoding.EncodeToString(resp.ScreenshotPng),
 		AppInfo: AppInfo{
-			Name:      resp.AppInfo.GetName(),
-			BundleID:  resp.AppInfo.GetBundleId(),
-			IsRunning: resp.AppInfo.GetIsRunning(),
+			Name:         resp.AppInfo.GetName(),
+			BundleID:     resp.AppInfo.GetBundleId(),
+			IsRunning:    resp.AppInfo.GetIsRunning(),
+			DaysSinceUse: resp.AppInfo.GetDaysSinceUsed(),
 		},
 	}, nil
 }

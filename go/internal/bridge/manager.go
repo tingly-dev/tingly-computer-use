@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 
+	"github.com/tingly-dev/tingly-computer-use/go/internal/obs"
 	pb "github.com/tingly-dev/tingly-computer-use/go/pkg/proto/computeruse/v1"
 )
 
@@ -117,14 +118,15 @@ func (m *Manager) EnsureRunning(ctx context.Context) error {
 	return nil
 }
 
-// Client returns the gRPC client wrapper. Panics if EnsureRunning has not been called.
-func (m *Manager) Client() *Client {
+// Client returns the gRPC client wrapper. Returns an error if EnsureRunning
+// has not been called or the connection has been closed.
+func (m *Manager) Client() (*Client, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.client == nil {
-		panic("bridge.Manager: Client() called before EnsureRunning()")
+		return nil, fmt.Errorf("bridge.Manager: Client() called before EnsureRunning()")
 	}
-	return m.client
+	return m.client, nil
 }
 
 // Close shuts down the gRPC connection and terminates the native process.
@@ -138,9 +140,11 @@ func (m *Manager) Close() {
 		m.client = nil
 	}
 	if m.cmd != nil && m.cmd.Process != nil {
+		pid := m.cmd.Process.Pid
 		_ = m.cmd.Process.Kill()
 		_ = m.cmd.Wait()
 		m.cmd = nil
+		obs.Info("native server stopped", "pid", pid)
 	}
 }
 
@@ -151,6 +155,7 @@ func (m *Manager) startNative() error {
 		return err
 	}
 	m.cmd = cmd
+	obs.Info("spawned native server", "pid", cmd.Process.Pid, "bin", m.cfg.NativeBinPath, "socket", m.cfg.SocketPath)
 	return nil
 }
 

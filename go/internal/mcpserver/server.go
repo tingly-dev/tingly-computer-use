@@ -30,7 +30,10 @@ func (s *Server) ServeStdio() error {
 		server.WithToolCapabilities(true),
 	)
 
-	client := s.mgr.Client()
+	client, err := s.mgr.Client()
+	if err != nil {
+		return err
+	}
 	h := tools.NewHandlers(client)
 
 	registerTools(mcpSrv, h)
