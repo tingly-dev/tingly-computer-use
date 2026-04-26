@@ -8,33 +8,10 @@ public final class AppDiscovery {
 
     // MARK: - Safety denylist
 
-    /// Bundle IDs that must never be automated (terminals, password managers, browsers, etc.).
-    private static let deniedBundleIDs: Set<String> = [
-        // Terminals
-        "com.apple.Terminal",
-        "com.googlecode.iterm2",
-        "dev.warp.Warp-Stable",
-        "net.kovidgoyal.kitty",
-        "com.github.wez.wezterm",
-        "com.mitchellh.ghostty",
-        "com.github.rio-term.rio",
-        // Password managers
-        "com.1password.1password",
-        "com.bitwarden.desktop",
-        "com.dashlane.dashlane",
-        "com.lastpass.lastpass",
-        "com.nordpass.NordPass",
-        "me.proton.pass",
-        // Browser (can access credentials)
-        "com.google.Chrome",
-        // Tingly itself / security agents
-        "com.apple.SecurityAgent",
-        "com.apple.keychainaccess",
-    ]
-
     /// Returns true if the given bundle ID is on the safety denylist.
+    /// Backed by `DenyList.shared` (configurable via env vars).
     public func isDenied(bundleID: String) -> Bool {
-        Self.deniedBundleIDs.contains(bundleID)
+        DenyList.shared.isDenied(bundleID: bundleID)
     }
 
     // MARK: - List apps
@@ -97,12 +74,12 @@ public final class AppDiscovery {
     /// Resolves a PID for the given app name or bundle identifier.
     /// If the app is not running, attempts to launch it and waits up to 10 s.
     /// Throws ComputerUseError.appNotFound if the app cannot be found or launched.
-    public func resolvePID(app: String) throws -> pid_t {
+    public func resolvePID(app: String) async throws -> pid_t {
         // 1. Check already-running apps.
         if let pid = findRunning(app: app) { return pid }
 
         // 2. Try to launch by bundle ID or name.
-        guard let runningApp = try launchApp(query: app) else {
+        guard let runningApp = try await launchApp(query: app) else {
             throw ComputerUseError.appNotFound(app)
         }
         return runningApp.processIdentifier
@@ -111,7 +88,7 @@ public final class AppDiscovery {
     /// Re-opens the app to create a new window (for apps already running but with no window).
     /// Uses NSWorkspace.openApplication without activates=true, which signals macOS to open a
     /// new document/window without forcibly stealing focus.
-    public func reopenToCreateWindow(app: String) throws {
+    public func reopenToCreateWindow(app: String) async throws {
         let workspace = NSWorkspace.shared
 
         // Find the running application to get its bundle URL.
@@ -130,11 +107,11 @@ public final class AppDiscovery {
         // Do not activate (steal focus) — just ask the app to open a new window.
         config.activates = false
 
-        let sema = DispatchSemaphore(value: 0)
-        workspace.openApplication(at: bundleURL, configuration: config) { _, _ in
-            sema.signal()
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            workspace.openApplication(at: bundleURL, configuration: config) { _, _ in
+                cont.resume()
+            }
         }
-        sema.wait()
     }
 
     // MARK: - Private
@@ -153,7 +130,7 @@ public final class AppDiscovery {
         return nil
     }
 
-    private func launchApp(query: String) throws -> NSRunningApplication? {
+    private func launchApp(query: String) async throws -> NSRunningApplication? {
         // Try to find a bundle on disk by bundle ID first, then by name.
         let workspace = NSWorkspace.shared
 
@@ -163,7 +140,7 @@ public final class AppDiscovery {
             if isDenied(bundleID: bid) {
                 throw ComputerUseError.appNotFound("\(query) (blocked by safety policy)")
             }
-            return try launchAndWait(url: url)
+            return try await launchAndWait(url: url)
         }
 
         // By name via MDQuery.
@@ -181,35 +158,33 @@ public final class AppDiscovery {
             if isDenied(bundleID: bid) {
                 throw ComputerUseError.appNotFound("\(query) (blocked by safety policy)")
             }
-            return try launchAndWait(url: url)
+            return try await launchAndWait(url: url)
         }
 
         return nil
     }
 
-    private func launchAndWait(url: URL) throws -> NSRunningApplication? {
+    private func launchAndWait(url: URL) async throws -> NSRunningApplication? {
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true
 
-        var launched: NSRunningApplication?
-        var launchError: Error?
-        let sema = DispatchSemaphore(value: 0)
-
-        NSWorkspace.shared.openApplication(at: url, configuration: config) { app, err in
-            launched = app
-            launchError = err
-            sema.signal()
+        let launched: NSRunningApplication? = try await withCheckedThrowingContinuation { cont in
+            NSWorkspace.shared.openApplication(at: url, configuration: config) { app, err in
+                if let err = err {
+                    cont.resume(throwing: err)
+                } else {
+                    cont.resume(returning: app)
+                }
+            }
         }
-        sema.wait()
 
-        if let err = launchError { throw err }
         guard let app = launched else { return nil }
 
         // Wait up to 10 s for the app to become active/ready.
         let deadline = Date().addingTimeInterval(10)
         while Date() < deadline {
             if !app.isTerminated { return app }
-            Thread.sleep(forTimeInterval: 0.2)
+            try await Task.sleep(nanoseconds: 200_000_000)
         }
         return app
     }

@@ -38,7 +38,7 @@ public struct ComputerUseServiceImpl: Computeruse_V1_ComputerUseService.SimpleSe
         guard !app.isEmpty else {
             throw RPCError(code: .invalidArgument, message: "app is required")
         }
-        let pid = try AppDiscovery.shared.resolvePID(app: app)
+        let pid = try await AppDiscovery.shared.resolvePID(app: app)
         let snapshot: AppStateSnapshot
         do {
             snapshot = try await AppSnapshotBuilder.build(pid: pid, app: app)
@@ -46,7 +46,7 @@ public struct ComputerUseServiceImpl: Computeruse_V1_ComputerUseService.SimpleSe
             // App is running but has no visible window. Re-open it so macOS creates one,
             // wait briefly for it to appear, then retry once.
             fputs("[tingly-cu-native] no window for \(app), reopening to create one\n", stderr)
-            try AppDiscovery.shared.reopenToCreateWindow(app: app)
+            try await AppDiscovery.shared.reopenToCreateWindow(app: app)
             try await Task.sleep(for: .milliseconds(800))
             do {
                 snapshot = try await AppSnapshotBuilder.build(pid: pid, app: app)
@@ -83,11 +83,13 @@ public struct ComputerUseServiceImpl: Computeruse_V1_ComputerUseService.SimpleSe
         context: GRPCCore.ServerContext
     ) async throws -> Computeruse_V1_ActionResponse {
         return await actionResult {
-            let pid = try AppDiscovery.shared.resolvePID(app: request.app)
+            let pid = try await AppDiscovery.shared.resolvePID(app: request.app)
             let snapshot = snapshotCache.get(app: request.app)
             let elementIndex = request.elementIndex.isEmpty ? nil : request.elementIndex
-            let x = request.x == 0 && request.y == 0 ? nil : Optional(request.x)
-            let y = request.x == 0 && request.y == 0 ? nil : Optional(request.y)
+            // NaN is used by Go callers to encode "coordinate not provided",
+            // so legitimate (0,0) clicks remain reachable.
+            let x: Double? = request.x.isNaN ? nil : request.x
+            let y: Double? = request.y.isNaN ? nil : request.y
             try await InputSimulator.click(
                 pid: pid,
                 elementIndex: elementIndex,
@@ -104,7 +106,7 @@ public struct ComputerUseServiceImpl: Computeruse_V1_ComputerUseService.SimpleSe
         context: GRPCCore.ServerContext
     ) async throws -> Computeruse_V1_ActionResponse {
         return await actionResult {
-            let pid = try AppDiscovery.shared.resolvePID(app: request.app)
+            let pid = try await AppDiscovery.shared.resolvePID(app: request.app)
             try await InputSimulator.typeText(pid: pid, text: request.text)
         }
     }
@@ -114,7 +116,7 @@ public struct ComputerUseServiceImpl: Computeruse_V1_ComputerUseService.SimpleSe
         context: GRPCCore.ServerContext
     ) async throws -> Computeruse_V1_ActionResponse {
         return await actionResult {
-            let pid = try AppDiscovery.shared.resolvePID(app: request.app)
+            let pid = try await AppDiscovery.shared.resolvePID(app: request.app)
             try await InputSimulator.pressKey(pid: pid, key: request.key)
         }
     }
@@ -124,7 +126,7 @@ public struct ComputerUseServiceImpl: Computeruse_V1_ComputerUseService.SimpleSe
         context: GRPCCore.ServerContext
     ) async throws -> Computeruse_V1_ActionResponse {
         return await actionResult {
-            let pid = try AppDiscovery.shared.resolvePID(app: request.app)
+            let pid = try await AppDiscovery.shared.resolvePID(app: request.app)
             let snapshot = snapshotCache.get(app: request.app)
             try await InputSimulator.scroll(
                 pid: pid,
@@ -141,7 +143,7 @@ public struct ComputerUseServiceImpl: Computeruse_V1_ComputerUseService.SimpleSe
         context: GRPCCore.ServerContext
     ) async throws -> Computeruse_V1_ActionResponse {
         return await actionResult {
-            let pid = try AppDiscovery.shared.resolvePID(app: request.app)
+            let pid = try await AppDiscovery.shared.resolvePID(app: request.app)
             let snapshot = snapshotCache.get(app: request.app)
             try await InputSimulator.drag(
                 pid: pid,
@@ -157,7 +159,7 @@ public struct ComputerUseServiceImpl: Computeruse_V1_ComputerUseService.SimpleSe
         context: GRPCCore.ServerContext
     ) async throws -> Computeruse_V1_ActionResponse {
         return await actionResult {
-            let pid = try AppDiscovery.shared.resolvePID(app: request.app)
+            let pid = try await AppDiscovery.shared.resolvePID(app: request.app)
             let snapshot = snapshotCache.get(app: request.app)
             try await InputSimulator.performSecondaryAction(
                 pid: pid,
@@ -173,7 +175,7 @@ public struct ComputerUseServiceImpl: Computeruse_V1_ComputerUseService.SimpleSe
         context: GRPCCore.ServerContext
     ) async throws -> Computeruse_V1_ActionResponse {
         return await actionResult {
-            let pid = try AppDiscovery.shared.resolvePID(app: request.app)
+            let pid = try await AppDiscovery.shared.resolvePID(app: request.app)
             let snapshot = snapshotCache.get(app: request.app)
             try await InputSimulator.setValue(
                 pid: pid,
