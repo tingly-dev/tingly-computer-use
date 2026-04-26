@@ -32,11 +32,25 @@ public enum InputSimulator {
     // MARK: - Type Text
 
     public static func typeText(pid: pid_t, text: String) async throws {
-        let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true)!
-        for scalar in text.unicodeScalars {
-            var chars = [UniChar(scalar.value & 0xFFFF)]
-            event.keyboardSetUnicodeString(stringLength: chars.count, unicodeString: &chars)
-            event.postToPid(pid)
+        // Iterate by Character (grapheme cluster) so multi-scalar emoji and
+        // composed characters travel as a single key event.
+        for character in text {
+            try Task.checkCancellation()
+            let utf16 = Array(character.utf16)
+            // Independent down/up events per character — never share or mutate
+            // a single CGEvent across iterations (causes lost / duplicated keys).
+            guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
+                  let up   = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) else {
+                throw ComputerUseError.inputFailed("typeText: failed to create CGEvent")
+            }
+            utf16.withUnsafeBufferPointer { buf in
+                if let base = buf.baseAddress {
+                    down.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: base)
+                    up.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: base)
+                }
+            }
+            down.postToPid(pid)
+            up.postToPid(pid)
             try await Task.sleep(nanoseconds: 20_000_000) // 20ms between chars
         }
     }

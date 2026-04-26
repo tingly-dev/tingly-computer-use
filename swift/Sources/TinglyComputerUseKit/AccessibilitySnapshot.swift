@@ -52,7 +52,12 @@ public final class AccessibilitySnapshot {
 
         var focusedRef: CFTypeRef?
         AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focusedRef)
-        let focusedElement = focusedRef as! AXUIElement?
+        let focusedElement: AXUIElement?
+        if let ref = focusedRef, CFGetTypeID(ref) == AXUIElementGetTypeID() {
+            focusedElement = (ref as! AXUIElement)
+        } else {
+            focusedElement = nil
+        }
 
         traverse(element: window, depth: 0, windowBounds: windowBounds,
                  focusedElement: focusedElement)
@@ -203,11 +208,13 @@ public final class AccessibilitySnapshot {
         var pos = CGPoint.zero
         var size = CGSize.zero
 
-        if AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &posRef) == .success {
-            AXValueGetValue(posRef as! AXValue, .cgPoint, &pos)
+        if AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &posRef) == .success,
+           let raw = posRef, CFGetTypeID(raw) == AXValueGetTypeID() {
+            AXValueGetValue(raw as! AXValue, .cgPoint, &pos)
         }
-        if AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeRef) == .success {
-            AXValueGetValue(sizeRef as! AXValue, .cgSize, &size)
+        if AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeRef) == .success,
+           let raw = sizeRef, CFGetTypeID(raw) == AXValueGetTypeID() {
+            AXValueGetValue(raw as! AXValue, .cgSize, &size)
         }
 
         // Convert to window-local coordinates.
@@ -223,8 +230,8 @@ public final class AccessibilitySnapshot {
     static func resolveWindow(app: AXUIElement) -> AXUIElement? {
         var ref: CFTypeRef?
         if AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &ref) == .success,
-           let window = ref as! AXUIElement? {
-            return window
+           let raw = ref, CFGetTypeID(raw) == AXUIElementGetTypeID() {
+            return (raw as! AXUIElement)
         }
         // Fall back to the first available window.
         var winRef: CFTypeRef?
@@ -242,11 +249,13 @@ public final class AccessibilitySnapshot {
         var pos = CGPoint.zero
         var size = CGSize.zero
 
-        if AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &posRef) == .success {
-            AXValueGetValue(posRef as! AXValue, .cgPoint, &pos)
+        if AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &posRef) == .success,
+           let raw = posRef, CFGetTypeID(raw) == AXValueGetTypeID() {
+            AXValueGetValue(raw as! AXValue, .cgPoint, &pos)
         }
-        if AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeRef) == .success {
-            AXValueGetValue(sizeRef as! AXValue, .cgSize, &size)
+        if AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeRef) == .success,
+           let raw = sizeRef, CFGetTypeID(raw) == AXValueGetTypeID() {
+            AXValueGetValue(raw as! AXValue, .cgSize, &size)
         }
 
         guard size != .zero else { return nil }

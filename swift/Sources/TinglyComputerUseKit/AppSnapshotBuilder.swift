@@ -64,7 +64,7 @@ public enum AppSnapshotBuilder {
                 runningApp.activate(options: [.activateAllWindows])
             }
         } else {
-            fputs("[tingly-cu-native] focusWindow: no NSRunningApplication for pid \(pid)\n", stderr)
+            Log.warn("focusWindow: no NSRunningApplication", "pid", pid)
         }
 
         // Wait up to 5 s for a window to appear (20 × 0.25 s).
@@ -144,20 +144,28 @@ public enum AppSnapshotBuilder {
 }
 
 /// Per-turn in-memory cache of app snapshots. Keyed by app name (lowercased).
+/// Thread-safe: concurrent gRPC handlers may read/write simultaneously.
 public final class AppSnapshotCache: @unchecked Sendable {
+    private let lock = NSLock()
     private var cache: [String: AppStateSnapshot] = [:]
 
     public init() {}
 
     public func set(_ snapshot: AppStateSnapshot, app: String) {
+        lock.lock()
+        defer { lock.unlock() }
         cache[app.lowercased()] = snapshot
     }
 
     public func get(app: String) -> AppStateSnapshot? {
+        lock.lock()
+        defer { lock.unlock() }
         return cache[app.lowercased()]
     }
 
     public func clear() {
+        lock.lock()
+        defer { lock.unlock() }
         cache.removeAll()
     }
 }
