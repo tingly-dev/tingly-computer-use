@@ -35,7 +35,7 @@ public final class ComputerUseGRPCServer {
             group.addTask { try await server.serve() }
             // Wait until the server is actually listening before printing the ready message.
             if let _ = try await server.listeningAddress {
-                fputs("[tingly-cu-native] listening on \(self.socketPath)\n", stderr)
+                Log.info("native server listening", "socket", self.socketPath)
             }
             // Suspend until the task group is cancelled (i.e., process is killed).
             while !Task.isCancelled {

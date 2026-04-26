@@ -42,13 +42,13 @@ struct TinglyComputerUseMain {
         // Remove stale socket file if it exists.
         try? FileManager.default.removeItem(atPath: socketPath)
 
-        fputs("[tingly-cu-native] starting gRPC server on \(socketPath)\n", stderr)
+        Log.info("starting gRPC server", "socket", socketPath)
 
         do {
             let server = ComputerUseGRPCServer(socketPath: socketPath)
             try await server.run()
         } catch {
-            fputs("error: \(error)\n", stderr)
+            Log.error("server exited with error", "error", "\(error)")
             exit(1)
         }
     }
