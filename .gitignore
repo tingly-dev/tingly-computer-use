@@ -1,6 +1,7 @@
 # User
 swift/.build
 .idea
+.task
 
 # Git ignore file
 
