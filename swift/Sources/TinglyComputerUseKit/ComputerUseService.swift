@@ -42,6 +42,18 @@ public struct ComputerUseServiceImpl: Computeruse_V1_ComputerUseService.SimpleSe
         let snapshot: AppStateSnapshot
         do {
             snapshot = try await AppSnapshotBuilder.build(pid: pid, app: app)
+        } catch ComputerUseError.noWindow {
+            // App is running but has no visible window. Re-open it so macOS creates one,
+            // wait briefly for it to appear, then retry once.
+            fputs("[tingly-cu-native] no window for \(app), reopening to create one\n", stderr)
+            try AppDiscovery.shared.reopenToCreateWindow(app: app)
+            try await Task.sleep(for: .milliseconds(800))
+            do {
+                snapshot = try await AppSnapshotBuilder.build(pid: pid, app: app)
+            } catch {
+                fputs("[tingly-cu-native] getAppState error after reopen: \(error)\n", stderr)
+                throw RPCError(code: .internalError, message: "getAppState failed: \(error)")
+            }
         } catch {
             fputs("[tingly-cu-native] getAppState error: \(error)\n", stderr)
             throw RPCError(code: .internalError, message: "getAppState failed: \(error)")

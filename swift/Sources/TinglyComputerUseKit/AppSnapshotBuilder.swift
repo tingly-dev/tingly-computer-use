@@ -1,3 +1,4 @@
+import AppKit
 import ApplicationServices
 import Foundation
 import ImageIO
@@ -20,6 +21,9 @@ public struct AppStateSnapshot {
 public enum AppSnapshotBuilder {
 
     public static func build(pid: pid_t, app: String) async throws -> AppStateSnapshot {
+        // Ensure the app has a visible, focused window before snapshotting.
+        try await focusWindow(pid: pid)
+
         // Run AX snapshot and screenshot truly concurrently.
         async let axResult = buildAX(pid: pid, app: app)
         async let screenshotResult = WindowCapture.capture(pid: pid)
@@ -37,6 +41,69 @@ public enum AppSnapshotBuilder {
             screenshotPixelSize: pixelSize,
             elements: ax.elements
         )
+    }
+
+    // MARK: - Window focus
+
+    /// Ensures the app has a raised, focused window before snapshotting.
+    /// If no window is currently focused, tries AX raise actions first, then
+    /// falls back to NSRunningApplication.activate, waits, and retries.
+    /// Throws `noWindow` only if the app has no windows at all after the attempt.
+    private static func focusWindow(pid: pid_t) async throws {
+        let appElement = AXUIElementCreateApplication(pid)
+
+        // Fast path: already have a focused window — raise it to be safe.
+        if let window = AccessibilitySnapshot.resolveWindow(app: appElement) {
+            raiseWindow(window, pid: pid)
+            return
+        }
+
+        // No window found: activate the app to trigger window creation/restore.
+        if let runningApp = NSRunningApplication(processIdentifier: pid) {
+            DispatchQueue.main.async {
+                runningApp.activate(options: [.activateAllWindows])
+            }
+        } else {
+            fputs("[tingly-cu-native] focusWindow: no NSRunningApplication for pid \(pid)\n", stderr)
+        }
+
+        // Wait up to 5 s for a window to appear (20 × 0.25 s).
+        for _ in 0..<20 {
+            try await Task.sleep(for: .milliseconds(250))
+            if let window = AccessibilitySnapshot.resolveWindow(app: appElement) {
+                raiseWindow(window, pid: pid)
+                // Brief pause for the window to fully render on screen.
+                try await Task.sleep(for: .milliseconds(150))
+                return
+            }
+        }
+
+        throw ComputerUseError.noWindow
+    }
+
+    /// Attempts to raise and focus a window via AX actions (raise → main → focused).
+    private static func raiseWindow(_ window: AXUIElement, pid: pid_t) {
+        // Try kAXRaiseAction first.
+        var actionsRef: CFArray?
+        if AXUIElementCopyActionNames(window, &actionsRef) == .success,
+           let actions = actionsRef as? [String],
+           actions.contains(kAXRaiseAction as String) {
+            if AXUIElementPerformAction(window, kAXRaiseAction as CFString) == .success { return }
+        }
+
+        // Try setting kAXMainAttribute.
+        var settable: DarwinBoolean = false
+        if AXUIElementIsAttributeSettable(window, kAXMainAttribute as CFString, &settable) == .success,
+           settable.boolValue {
+            if AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue) == .success { return }
+        }
+
+        // Try setting kAXFocusedAttribute.
+        settable = false
+        if AXUIElementIsAttributeSettable(window, kAXFocusedAttribute as CFString, &settable) == .success,
+           settable.boolValue {
+            _ = AXUIElementSetAttributeValue(window, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+        }
     }
 
     // MARK: - Private

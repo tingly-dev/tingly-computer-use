@@ -108,6 +108,35 @@ public final class AppDiscovery {
         return runningApp.processIdentifier
     }
 
+    /// Re-opens the app to create a new window (for apps already running but with no window).
+    /// Uses NSWorkspace.openApplication without activates=true, which signals macOS to open a
+    /// new document/window without forcibly stealing focus.
+    public func reopenToCreateWindow(app: String) throws {
+        let workspace = NSWorkspace.shared
+
+        // Find the running application to get its bundle URL.
+        guard let running = workspace.runningApplications.first(where: { a in
+            guard a.activationPolicy == .regular else { return false }
+            let bid = a.bundleIdentifier ?? ""
+            if isDenied(bundleID: bid) { return false }
+            return a.localizedName?.lowercased() == app.lowercased()
+                || bid.lowercased() == app.lowercased()
+        }), let bundleURL = running.bundleURL else {
+            // App not found — nothing to reopen.
+            return
+        }
+
+        let config = NSWorkspace.OpenConfiguration()
+        // Do not activate (steal focus) — just ask the app to open a new window.
+        config.activates = false
+
+        let sema = DispatchSemaphore(value: 0)
+        workspace.openApplication(at: bundleURL, configuration: config) { _, _ in
+            sema.signal()
+        }
+        sema.wait()
+    }
+
     // MARK: - Private
 
     private func findRunning(app: String) -> pid_t? {
