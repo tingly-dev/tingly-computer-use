@@ -28,7 +28,7 @@ public final class AccessibilitySnapshot {
 
     public init() {}
 
-    /// Build snapshot from the app's focused window.
+    /// Build snapshot from the app's focused window, falling back to the first available window.
     public func build(pid: pid_t) throws {
         elements = []
         nodeCount = 0
@@ -36,20 +36,19 @@ public final class AccessibilitySnapshot {
 
         let appElement = AXUIElementCreateApplication(pid)
 
-        // Get focused window bounds for coordinate normalization.
-        guard let windowBounds = Self.windowBounds(app: appElement) else {
+        // Resolve a window: prefer focused, fall back to first available.
+        guard let window = Self.resolveWindow(app: appElement) else {
+            throw ComputerUseError.noWindow
+        }
+
+        // Get window bounds for coordinate normalization.
+        guard let windowBounds = Self.bounds(of: window) else {
             throw ComputerUseError.noWindow
         }
 
         var focusedRef: CFTypeRef?
         AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focusedRef)
         let focusedElement = focusedRef as! AXUIElement?
-
-        var rootRef: CFTypeRef?
-        AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &rootRef)
-        guard let window = rootRef as! AXUIElement? else {
-            throw ComputerUseError.noWindow
-        }
 
         traverse(element: window, depth: 0, windowBounds: windowBounds,
                  focusedElement: focusedElement)
@@ -206,11 +205,24 @@ public final class AccessibilitySnapshot {
         )
     }
 
-    static func windowBounds(app: AXUIElement) -> CGRect? {
+    /// Returns the focused window for `app`, falling back to the first window in kAXWindowsAttribute.
+    static func resolveWindow(app: AXUIElement) -> AXUIElement? {
         var ref: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &ref) == .success,
-              let window = ref as! AXUIElement? else { return nil }
+        if AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &ref) == .success,
+           let window = ref as! AXUIElement? {
+            return window
+        }
+        // Fall back to the first available window.
+        var winRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &winRef) == .success,
+           let windows = winRef as? [AXUIElement], let first = windows.first {
+            return first
+        }
+        return nil
+    }
 
+    /// Returns the bounds of a specific window element.
+    static func bounds(of window: AXUIElement) -> CGRect? {
         var posRef: CFTypeRef?
         var sizeRef: CFTypeRef?
         var pos = CGPoint.zero
@@ -223,6 +235,13 @@ public final class AccessibilitySnapshot {
             AXValueGetValue(sizeRef as! AXValue, .cgSize, &size)
         }
 
+        guard size != .zero else { return nil }
         return CGRect(origin: pos, size: size)
+    }
+
+    /// Returns the bounds of the focused (or first available) window for `app`.
+    static func windowBounds(app: AXUIElement) -> CGRect? {
+        guard let window = resolveWindow(app: app) else { return nil }
+        return bounds(of: window)
     }
 }
