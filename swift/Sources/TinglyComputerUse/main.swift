@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import TinglyComputerUseKit
 
@@ -33,6 +34,10 @@ struct TinglyComputerUseMain {
                 i += 1
             }
         }
+
+        // Initialize AppKit/CoreGraphics session — required for ScreenCaptureKit,
+        // CGEvent, and any Quartz Window Services API (CGS_REQUIRE_INIT).
+        await MainActor.run { _ = NSApplication.shared }
 
         // Remove stale socket file if it exists.
         try? FileManager.default.removeItem(atPath: socketPath)

@@ -17,6 +17,8 @@ public final class AccessibilitySnapshot {
         /// Frame in window-local logical points.
         public let frame: CGRect
         public let depth: Int
+        /// Live AX reference — used for semantic actions (AXPress, setValue, etc.).
+        public let axElement: AXUIElement
     }
 
     public private(set) var elements: [Element] = []
@@ -97,7 +99,8 @@ public final class AccessibilitySnapshot {
             isSettable: settable.boolValue,
             actions: actionNames,
             frame: frame,
-            depth: depth
+            depth: depth,
+            axElement: element
         )
         elements.append(el)
 

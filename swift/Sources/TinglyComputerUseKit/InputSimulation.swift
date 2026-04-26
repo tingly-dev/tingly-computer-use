@@ -13,16 +13,20 @@ public enum InputSimulator {
                              button: MouseButtonKind) async throws {
         // 1. Try AX semantic action if element index is provided.
         if let idx = elementIndex, let snap = snapshot, let el = snap.elements[idx] {
-            if tryAXPress(pid: pid, element: el) { return }
+            if tryAXPress(element: el) { return }
         }
 
-        // 2. Resolve click point.
-        let point = try resolveClickPoint(
+        // 2. Resolve click point in window-local logical coords.
+        let localPoint = try resolveClickPoint(
             elementIndex: elementIndex, x: x, y: y, snapshot: snapshot
         )
 
-        // 3. Post targeted mouse events to PID.
-        postMouseClick(pid: pid, point: point, button: button, clickCount: clickCount)
+        // 3. Convert to global Quartz screen coordinates.
+        let wb = snapshot?.windowBounds ?? .zero
+        let global = toGlobalPoint(point: localPoint, windowBounds: wb)
+
+        // 4. Post targeted mouse events to PID.
+        postMouseClick(pid: pid, point: global, button: button, clickCount: clickCount)
     }
 
     // MARK: - Type Text
@@ -59,7 +63,10 @@ public enum InputSimulator {
 
     public static func scroll(pid: pid_t, elementIndex: String, snapshot: AppStateSnapshot?,
                               direction: ScrollDirectionKind, pages: Double) async throws {
-        let point = try resolveElementCenter(elementIndex: elementIndex, snapshot: snapshot)
+        let localPoint = try resolveElementCenter(elementIndex: elementIndex, snapshot: snapshot)
+        let wb = snapshot?.windowBounds ?? .zero
+        let global = toGlobalPoint(point: localPoint, windowBounds: wb)
+
         let delta = Int32(max(1, Int32(exactly: (12.0 * pages).rounded()) ?? 12))
 
         let (wheel1, wheel2): (Int32, Int32)
@@ -74,7 +81,7 @@ public enum InputSimulator {
                                   wheelCount: 2, wheel1: wheel1, wheel2: wheel2, wheel3: 0) else {
             throw ComputerUseError.inputFailed("scroll event creation failed")
         }
-        event.location = toGlobalPoint(point: point, windowBounds: snapshot?.windowBounds ?? .zero)
+        event.location = global
         event.postToPid(pid)
         try await Task.sleep(nanoseconds: 100_000_000)
     }
@@ -86,11 +93,11 @@ public enum InputSimulator {
                             snapshot: AppStateSnapshot?) async throws {
         let wb = snapshot?.windowBounds ?? .zero
         let from = toGlobalPoint(point: CGPoint(x: fromX, y: fromY), windowBounds: wb)
-        let to = toGlobalPoint(point: CGPoint(x: toX, y: toY), windowBounds: wb)
+        let to   = toGlobalPoint(point: CGPoint(x: toX,   y: toY),   windowBounds: wb)
         let steps = 10
 
-        postMouseEvent(pid: pid, type: .mouseMoved, point: from, button: .left)
-        postMouseEvent(pid: pid, type: .leftMouseDown, point: from, button: .left)
+        postMouseEvent(pid: pid, type: .mouseMoved,     point: from, button: .left)
+        postMouseEvent(pid: pid, type: .leftMouseDown,  point: from, button: .left)
 
         for i in 1...steps {
             let t = CGFloat(i) / CGFloat(steps)
@@ -111,47 +118,80 @@ public enum InputSimulator {
         guard let snap = snapshot, let el = snap.elements[elementIndex] else {
             throw ComputerUseError.elementNotFound(elementIndex)
         }
-        _ = el // AX element lookup would use the stored AXUIElement reference
-        // NOTE: full implementation stores AXUIElement refs in the snapshot cache.
-        // For Phase 1, this is a stub.
-        throw ComputerUseError.notImplemented("performSecondaryAction requires AX element cache")
+        guard el.actions.contains(action) else {
+            throw ComputerUseError.inputFailed(
+                "Action \"\(action)\" not available on element \(elementIndex). " +
+                "Available: \(el.actions.joined(separator: ", "))"
+            )
+        }
+        let result = AXUIElementPerformAction(el.axElement, action as CFString)
+        guard result == .success else {
+            throw ComputerUseError.inputFailed(
+                "AXUIElementPerformAction(\"\(action)\") failed with code \(result.rawValue)"
+            )
+        }
     }
 
     // MARK: - Set Value
 
     public static func setValue(pid: pid_t, elementIndex: String, value: String,
                                 snapshot: AppStateSnapshot?) async throws {
-        guard let snap = snapshot, snap.elements[elementIndex] != nil else {
+        guard let snap = snapshot, let el = snap.elements[elementIndex] else {
             throw ComputerUseError.elementNotFound(elementIndex)
         }
-        // NOTE: full implementation calls AXUIElementSetAttributeValue on the cached element.
-        throw ComputerUseError.notImplemented("setValue requires AX element cache")
+        guard el.isSettable else {
+            throw ComputerUseError.inputFailed(
+                "Element \(elementIndex) (\(el.role)) does not have a settable value attribute."
+            )
+        }
+        let result = AXUIElementSetAttributeValue(
+            el.axElement, kAXValueAttribute as CFString, value as CFTypeRef
+        )
+        guard result == .success else {
+            throw ComputerUseError.inputFailed(
+                "AXUIElementSetAttributeValue failed with code \(result.rawValue)"
+            )
+        }
     }
 
     // MARK: - Helpers
 
-    private static func tryAXPress(pid: pid_t, element: AccessibilitySnapshot.Element) -> Bool {
-        // Phase 2: lookup the live AXUIElement from cache and call AXPress.
-        // For Phase 1, return false to fall through to mouse events.
+    /// Try AX semantic action (AXPress / AXConfirm / AXOpen) on the element.
+    /// Returns true if an action was successfully performed.
+    private static func tryAXPress(element: AccessibilitySnapshot.Element) -> Bool {
+        for action in ["AXPress", "AXConfirm", "AXOpen"] {
+            guard element.actions.contains(action) else { continue }
+            let result = AXUIElementPerformAction(element.axElement, action as CFString)
+            if result == .success { return true }
+        }
         return false
     }
 
+    /// Resolve a click target to window-local logical coordinates.
+    /// Screenshot pixel coords are scaled down to logical points via the Retina scale factor.
     private static func resolveClickPoint(elementIndex: String?, x: Double?, y: Double?,
                                           snapshot: AppStateSnapshot?) throws -> CGPoint {
+        // Element-index path: use center of element's AX frame (already window-local).
         if let idx = elementIndex, let snap = snapshot, let el = snap.elements[idx] {
             return CGPoint(x: el.frame.midX, y: el.frame.midY)
         }
-        guard let x = x, let y = y else {
+
+        // Coordinate path: convert screenshot pixels → window-local logical points.
+        guard let xv = x, let yv = y else {
             throw ComputerUseError.missingCoordinates
         }
-        // Convert screenshot pixel → window-local point.
-        if let snap = snapshot {
-            let scaleX = snap.windowBounds.width / CGFloat(snap.screenshotPNG.count > 0 ? 1 : 1)
-            // Simplified: assume screenshot pixels already match logical coords / scale.
-            // Full implementation divides by backingScaleFactor.
-            _ = scaleX
+
+        guard let snap = snapshot,
+              snap.screenshotPixelSize.width > 0,
+              snap.windowBounds.width > 0 else {
+            // No snapshot context — treat as logical coords already.
+            return CGPoint(x: xv, y: yv)
         }
-        return CGPoint(x: x, y: y)
+
+        // Compute actual Retina scale factor from pixel vs. logical sizes.
+        let scaleX = snap.screenshotPixelSize.width  / snap.windowBounds.width
+        let scaleY = snap.screenshotPixelSize.height / snap.windowBounds.height
+        return CGPoint(x: xv / scaleX, y: yv / scaleY)
     }
 
     private static func resolveElementCenter(elementIndex: String,
@@ -169,8 +209,6 @@ public enum InputSimulator {
 
     private static func postMouseClick(pid: pid_t, point: CGPoint, button: MouseButtonKind,
                                        clickCount: Int) {
-        let wb = CGRect.zero // caller should pass real windowBounds
-        let global = toGlobalPoint(point: point, windowBounds: wb)
         let (downType, upType): (CGEventType, CGEventType)
         let cgButton: CGMouseButton
         switch button {
@@ -185,10 +223,10 @@ public enum InputSimulator {
             cgButton = .left
         }
 
-        postMouseEvent(pid: pid, type: .mouseMoved, point: global, button: cgButton)
+        postMouseEvent(pid: pid, type: .mouseMoved, point: point, button: cgButton)
         for _ in 0..<clickCount {
-            postMouseEvent(pid: pid, type: downType, point: global, button: cgButton)
-            postMouseEvent(pid: pid, type: upType, point: global, button: cgButton)
+            postMouseEvent(pid: pid, type: downType, point: point, button: cgButton)
+            postMouseEvent(pid: pid, type: upType,   point: point, button: cgButton)
         }
     }
 

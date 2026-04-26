@@ -78,8 +78,10 @@ func (m *Manager) EnsureRunning(ctx context.Context) error {
 		m.client = nil
 	}
 
-	// Start native process if socket doesn't exist yet.
-	if !socketExists(m.cfg.SocketPath) {
+	// Start native process if socket doesn't exist or is stale (not connectable).
+	if !socketConnectable(m.cfg.SocketPath) {
+		// Remove stale socket file if present.
+		_ = os.Remove(m.cfg.SocketPath)
 		if err := m.startNative(); err != nil {
 			return fmt.Errorf("start native process: %w", err)
 		}
@@ -142,9 +144,13 @@ func (m *Manager) startNative() error {
 	return nil
 }
 
-func socketExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
+func socketConnectable(path string) bool {
+	conn, err := net.DialTimeout("unix", path, 300*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
 }
 
 func waitForSocket(ctx context.Context, path string) error {
@@ -155,26 +161,30 @@ func waitForSocket(ctx context.Context, path string) error {
 		case <-ctx.Done():
 			return fmt.Errorf("timeout waiting for socket %s: %w", path, ctx.Err())
 		case <-ticker.C:
-			if socketExists(path) {
-				conn, err := net.DialTimeout("unix", path, 500*time.Millisecond)
-				if err == nil {
-					_ = conn.Close()
-					return nil
-				}
+			if _, err := os.Stat(path); err == nil {
+				// Socket file exists — give the server a moment to be fully ready.
+				time.Sleep(200 * time.Millisecond)
+				return nil
 			}
 		}
 	}
 }
 
 func resolveNativeBin() (string, error) {
-	// 1. Look alongside this binary.
+	// 1. TINGLY_CU_NATIVE env override (set by Taskfile for dev).
+	if env := os.Getenv("TINGLY_CU_NATIVE"); env != "" {
+		if _, err := os.Stat(env); err == nil {
+			return env, nil
+		}
+	}
+	// 2. Look alongside this binary.
 	if exe, err := os.Executable(); err == nil {
 		candidate := filepath.Join(filepath.Dir(exe), "tingly-cu-native")
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate, nil
 		}
 	}
-	// 2. PATH lookup.
+	// 3. PATH lookup.
 	if path, err := exec.LookPath("tingly-cu-native"); err == nil {
 		return path, nil
 	}

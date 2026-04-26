@@ -39,7 +39,13 @@ public struct ComputerUseServiceImpl: Computeruse_V1_ComputerUseService.SimpleSe
             throw RPCError(code: .invalidArgument, message: "app is required")
         }
         let pid = try AppDiscovery.shared.resolvePID(app: app)
-        let snapshot = try await AppSnapshotBuilder.build(pid: pid, app: app)
+        let snapshot: AppStateSnapshot
+        do {
+            snapshot = try await AppSnapshotBuilder.build(pid: pid, app: app)
+        } catch {
+            fputs("[tingly-cu-native] getAppState error: \(error)\n", stderr)
+            throw RPCError(code: .internalError, message: "getAppState failed: \(error)")
+        }
         snapshotCache.set(snapshot, app: app)
 
         var response = Computeruse_V1_GetAppStateResponse()
