@@ -3,6 +3,11 @@ swift/.build
 .idea
 .task
 
+# Build artifacts (do not commit)
+/go/tingly-cu
+/go/tingly-cu-native
+/snap.png
+
 # Git ignore file
 
 # Added by Tingly Git extension - 2026-04-26
