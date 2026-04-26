@@ -1,0 +1,183 @@
+// Package bridge manages the lifecycle of the Swift native process and
+// provides a gRPC client for communicating with it.
+package bridge
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
+
+	pb "github.com/tingly-dev/tingly-computer-use/go/pkg/proto/computeruse/v1"
+)
+
+const (
+	defaultStartTimeout = 10 * time.Second
+)
+
+// Config holds bridge configuration.
+type Config struct {
+	// Path to the tingly-cu-native binary.
+	// Resolved automatically from alongside this binary or PATH.
+	NativeBinPath string
+
+	// Unix socket path. Defaults to /tmp/tingly-cu-<uid>.sock
+	SocketPath string
+}
+
+// DefaultConfig returns a Config with sensible defaults.
+func DefaultConfig() Config {
+	return Config{
+		SocketPath: fmt.Sprintf("/tmp/tingly-cu-%d.sock", os.Getuid()),
+	}
+}
+
+// Manager manages the Swift native process and its gRPC connection.
+type Manager struct {
+	cfg    Config
+	mu     sync.Mutex
+	cmd    *exec.Cmd
+	conn   *grpc.ClientConn
+	client *Client
+}
+
+// NewManager creates a Manager with the given config.
+func NewManager(cfg Config) (*Manager, error) {
+	if cfg.NativeBinPath == "" {
+		bin, err := resolveNativeBin()
+		if err != nil {
+			return nil, err
+		}
+		cfg.NativeBinPath = bin
+	}
+	return &Manager{cfg: cfg}, nil
+}
+
+// EnsureRunning starts the native process if not already running and
+// establishes a gRPC connection.
+func (m *Manager) EnsureRunning(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Check if existing connection is still healthy.
+	if m.conn != nil {
+		state := m.conn.GetState()
+		if state != connectivity.Shutdown && state != connectivity.TransientFailure {
+			return nil
+		}
+		_ = m.conn.Close()
+		m.conn = nil
+		m.client = nil
+	}
+
+	// Start native process if socket doesn't exist yet.
+	if !socketExists(m.cfg.SocketPath) {
+		if err := m.startNative(); err != nil {
+			return fmt.Errorf("start native process: %w", err)
+		}
+	}
+
+	// Wait for socket to appear and be connectable.
+	dialCtx, cancel := context.WithTimeout(ctx, defaultStartTimeout)
+	defer cancel()
+	if err := waitForSocket(dialCtx, m.cfg.SocketPath); err != nil {
+		return fmt.Errorf("wait for native socket: %w", err)
+	}
+
+	conn, err := grpc.NewClient(
+		"unix://"+m.cfg.SocketPath,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return fmt.Errorf("dial native socket: %w", err)
+	}
+
+	m.conn = conn
+	m.client = newClient(pb.NewComputerUseServiceClient(conn))
+	return nil
+}
+
+// Client returns the gRPC client wrapper. Panics if EnsureRunning has not been called.
+func (m *Manager) Client() *Client {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.client == nil {
+		panic("bridge.Manager: Client() called before EnsureRunning()")
+	}
+	return m.client
+}
+
+// Close shuts down the gRPC connection and terminates the native process.
+func (m *Manager) Close() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.conn != nil {
+		_ = m.conn.Close()
+		m.conn = nil
+		m.client = nil
+	}
+	if m.cmd != nil && m.cmd.Process != nil {
+		_ = m.cmd.Process.Kill()
+		_ = m.cmd.Wait()
+		m.cmd = nil
+	}
+}
+
+func (m *Manager) startNative() error {
+	cmd := exec.Command(m.cfg.NativeBinPath, "serve", "--socket", m.cfg.SocketPath)
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	m.cmd = cmd
+	return nil
+}
+
+func socketExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func waitForSocket(ctx context.Context, path string) error {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for socket %s: %w", path, ctx.Err())
+		case <-ticker.C:
+			if socketExists(path) {
+				conn, err := net.DialTimeout("unix", path, 500*time.Millisecond)
+				if err == nil {
+					_ = conn.Close()
+					return nil
+				}
+			}
+		}
+	}
+}
+
+func resolveNativeBin() (string, error) {
+	// 1. Look alongside this binary.
+	if exe, err := os.Executable(); err == nil {
+		candidate := filepath.Join(filepath.Dir(exe), "tingly-cu-native")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		}
+	}
+	// 2. PATH lookup.
+	if path, err := exec.LookPath("tingly-cu-native"); err == nil {
+		return path, nil
+	}
+	return "", fmt.Errorf("tingly-cu-native not found alongside binary or on PATH; " +
+		"build the Swift package first: cd tingly-computer-use/swift && swift build -c release")
+}

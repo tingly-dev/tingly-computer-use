@@ -1,0 +1,185 @@
+syntax = "proto3";
+
+package computeruse.v1;
+
+option go_package = "github.com/tingly-dev/tingly-computer-use/go/pkg/proto/computeruse/v1;computerusev1";
+
+// ComputerUseService provides Mac desktop GUI control capabilities.
+// Transport: gRPC over Unix socket (local) or TCP (remote).
+service ComputerUseService {
+  // List running and recently used applications.
+  rpc ListApps(ListAppsRequest) returns (ListAppsResponse);
+
+  // Get the accessibility tree and screenshot of an app's key window.
+  // Must be called once per agent turn before interacting with the app.
+  rpc GetAppState(GetAppStateRequest) returns (GetAppStateResponse);
+
+  // Click an element by index or pixel coordinates from screenshot.
+  rpc Click(ClickRequest) returns (ActionResponse);
+
+  // Type literal text using keyboard input.
+  rpc TypeText(TypeTextRequest) returns (ActionResponse);
+
+  // Press a key or key-combination (xdotool syntax).
+  rpc PressKey(PressKeyRequest) returns (ActionResponse);
+
+  // Scroll an element in a direction.
+  rpc Scroll(ScrollRequest) returns (ActionResponse);
+
+  // Drag from one point to another using pixel coordinates.
+  rpc Drag(DragRequest) returns (ActionResponse);
+
+  // Invoke a secondary accessibility action on an element.
+  rpc PerformSecondaryAction(PerformSecondaryActionRequest) returns (ActionResponse);
+
+  // Set the value of a settable accessibility element.
+  rpc SetValue(SetValueRequest) returns (ActionResponse);
+
+  // Signal end of agent turn; clears visual cursor overlay state.
+  rpc TurnEnded(TurnEndedRequest) returns (TurnEndedResponse);
+
+  // Check required macOS permissions (Accessibility + Screen Recording).
+  rpc CheckPermissions(CheckPermissionsRequest) returns (CheckPermissionsResponse);
+}
+
+// ─── App Discovery ────────────────────────────────────────────────────────────
+
+message ListAppsRequest {}
+
+message ListAppsResponse {
+  repeated AppInfo apps = 1;
+}
+
+message AppInfo {
+  string name = 1;
+  string bundle_id = 2;
+  bool is_running = 3;
+  // Days since last used (0 = currently running).
+  int32 days_since_used = 4;
+}
+
+// ─── App State ────────────────────────────────────────────────────────────────
+
+message GetAppStateRequest {
+  // App name or bundle identifier.
+  string app = 1;
+}
+
+message GetAppStateResponse {
+  // Rendered accessibility tree as human-readable text.
+  // Each element has an index used for subsequent action calls.
+  string accessibility_tree = 1;
+
+  // Screenshot of the app's key window as PNG bytes (Retina resolution).
+  bytes screenshot_png = 2;
+
+  AppInfo app_info = 3;
+
+  // Window bounds in screen coordinates (logical points).
+  Rect window_bounds = 4;
+}
+
+message Rect {
+  double x = 1;
+  double y = 2;
+  double width = 3;
+  double height = 4;
+}
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
+
+message ClickRequest {
+  string app = 1;
+  // Element index from accessibility tree (mutually exclusive with x/y).
+  string element_index = 2;
+  // Screenshot pixel coordinates (mutually exclusive with element_index).
+  double x = 3;
+  double y = 4;
+  // Number of clicks. Defaults to 1.
+  int32 click_count = 5;
+  MouseButton mouse_button = 6;
+}
+
+enum MouseButton {
+  MOUSE_BUTTON_UNSPECIFIED = 0;
+  MOUSE_BUTTON_LEFT = 1;
+  MOUSE_BUTTON_RIGHT = 2;
+  MOUSE_BUTTON_MIDDLE = 3;
+}
+
+message TypeTextRequest {
+  string app = 1;
+  string text = 2;
+}
+
+message PressKeyRequest {
+  string app = 1;
+  // Key or key combination in xdotool syntax.
+  // Examples: "Return", "Tab", "super+c", "F1", "BackSpace", "KP_0"
+  string key = 2;
+}
+
+message ScrollRequest {
+  string app = 1;
+  string element_index = 2;
+  ScrollDirection direction = 3;
+  // Number of pages to scroll. Fractional values supported. Defaults to 1.
+  double pages = 4;
+}
+
+enum ScrollDirection {
+  SCROLL_DIRECTION_UNSPECIFIED = 0;
+  SCROLL_DIRECTION_UP = 1;
+  SCROLL_DIRECTION_DOWN = 2;
+  SCROLL_DIRECTION_LEFT = 3;
+  SCROLL_DIRECTION_RIGHT = 4;
+}
+
+message DragRequest {
+  string app = 1;
+  double from_x = 2;
+  double from_y = 3;
+  double to_x = 4;
+  double to_y = 5;
+}
+
+message PerformSecondaryActionRequest {
+  string app = 1;
+  string element_index = 2;
+  // Action name from the accessibility tree's secondary actions list.
+  string action = 3;
+}
+
+message SetValueRequest {
+  string app = 1;
+  string element_index = 2;
+  string value = 3;
+}
+
+// Generic response for action RPCs.
+message ActionResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// ─── Lifecycle ────────────────────────────────────────────────────────────────
+
+message TurnEndedRequest {
+  // Optional turn metadata.
+  string turn_id = 1;
+  string thread_id = 2;
+}
+
+message TurnEndedResponse {}
+
+// ─── Permissions ─────────────────────────────────────────────────────────────
+
+message CheckPermissionsRequest {}
+
+message CheckPermissionsResponse {
+  bool accessibility_granted = 1;
+  bool screen_recording_granted = 2;
+  // Deep link to open System Settings for the missing permission.
+  string accessibility_settings_url = 3;
+  string screen_recording_settings_url = 4;
+}

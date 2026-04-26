@@ -1,0 +1,126 @@
+version: "3"
+
+vars:
+  ROOT: "{{.TASKFILE_DIR}}"
+  GO_DIR: "{{.ROOT}}/go"
+  SWIFT_DIR: "{{.ROOT}}/swift"
+  BUILD_DIR: "{{.ROOT}}/build"
+  PROTO_DIR: "{{.ROOT}}/proto"
+
+  # Output binaries
+  GO_BIN: "{{.GO_DIR}}/tingly-cu"
+  SWIFT_BIN_DEBUG: "{{.SWIFT_DIR}}/.build/debug/tingly-cu-native"
+  SWIFT_BIN_RELEASE: "{{.SWIFT_DIR}}/.build/release/tingly-cu-native"
+
+  # Socket path for local dev
+  SOCKET: "/tmp/tingly-cu-{{.UID}}.sock"
+  UID:
+    sh: id -u
+
+tasks:
+  # ---------------------------------------------------------------------------
+  # Default: show available tasks
+  # ---------------------------------------------------------------------------
+  default:
+    silent: true
+    cmds:
+      - task --list
+
+  # ---------------------------------------------------------------------------
+  # Build
+  # ---------------------------------------------------------------------------
+  build:
+    desc: "Build everything (Swift debug + Go)"
+    deps: [build:swift, build:go]
+
+  build:release:
+    desc: "Build everything in release mode"
+    deps: [build:swift:release, build:go]
+    cmds:
+      - cp "{{.SWIFT_BIN_RELEASE}}" "{{.GO_DIR}}/tingly-cu-native"
+      - echo "Copied tingly-cu-native (release) alongside tingly-cu"
+
+  build:swift:
+    desc: "Build Swift native layer (debug)"
+    dir: "{{.SWIFT_DIR}}"
+    cmds:
+      - swift build --product tingly-cu-native
+      - cp "{{.SWIFT_BIN_DEBUG}}" "{{.GO_DIR}}/tingly-cu-native"
+      - echo "Copied tingly-cu-native (debug) alongside tingly-cu"
+    sources:
+      - "{{.SWIFT_DIR}}/Sources/**/*.swift"
+      - "{{.SWIFT_DIR}}/Package.swift"
+    generates:
+      - "{{.SWIFT_BIN_DEBUG}}"
+
+  build:swift:release:
+    desc: "Build Swift native layer (release)"
+    dir: "{{.SWIFT_DIR}}"
+    cmds:
+      - swift build --product tingly-cu-native -c release
+    sources:
+      - "{{.SWIFT_DIR}}/Sources/**/*.swift"
+      - "{{.SWIFT_DIR}}/Package.swift"
+    generates:
+      - "{{.SWIFT_BIN_RELEASE}}"
+
+  build:go:
+    desc: "Build Go MCP wrapper"
+    dir: "{{.GO_DIR}}"
+    env:
+      GOWORK: "off"
+    cmds:
+      - go build -o tingly-cu ./cmd/tingly-cu
+    sources:
+      - "{{.GO_DIR}}/**/*.go"
+      - "{{.GO_DIR}}/go.mod"
+    generates:
+      - "{{.GO_BIN}}"
+
+  # ---------------------------------------------------------------------------
+  # Proto codegen
+  # ---------------------------------------------------------------------------
+  gen:
+    desc: "Regenerate Go + Swift code from proto (requires protoc + plugins)"
+    cmds:
+      - bash "{{.BUILD_DIR}}/gen-proto.sh"
+
+  # ---------------------------------------------------------------------------
+  # Run
+  # ---------------------------------------------------------------------------
+  serve:
+    desc: "Start the Swift gRPC native server on Unix socket"
+    deps: [build:swift]
+    cmds:
+      - "{{.GO_DIR}}/tingly-cu-native serve --socket {{.SOCKET}}"
+
+  mcp:
+    desc: "Start the Go MCP stdio server (launches Swift server automatically)"
+    deps: [build]
+    cmds:
+      - "{{.GO_BIN}} mcp"
+
+  doctor:
+    desc: "Check macOS permissions (Accessibility + Screen Recording)"
+    deps: [build]
+    cmds:
+      - "{{.GO_BIN}} doctor"
+
+  # ---------------------------------------------------------------------------
+  # Dev helpers
+  # ---------------------------------------------------------------------------
+  clean:
+    desc: "Remove build artifacts"
+    cmds:
+      - rm -rf "{{.SWIFT_DIR}}/.build"
+      - rm -f "{{.GO_BIN}}"
+      - rm -f "{{.GO_DIR}}/tingly-cu-native"
+      - rm -f "{{.SOCKET}}"
+
+  tidy:
+    desc: "Run go mod tidy"
+    dir: "{{.GO_DIR}}"
+    env:
+      GOWORK: "off"
+    cmds:
+      - go mod tidy
