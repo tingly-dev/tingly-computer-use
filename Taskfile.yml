@@ -12,10 +12,9 @@ vars:
   SWIFT_BIN_DEBUG: "{{.SWIFT_DIR}}/.build/debug/tingly-cu-native"
   SWIFT_BIN_RELEASE: "{{.SWIFT_DIR}}/.build/release/tingly-cu-native"
 
-  # Socket path for local dev
-  SOCKET: "/tmp/tingly-cu-{{.UID}}.sock"
-  UID:
-    sh: id -u
+  # Socket path for local dev — evaluated at runtime via shell expansion
+  SOCKET:
+    sh: echo "/tmp/tingly-cu-$(id -u).sock"
 
 tasks:
   # ---------------------------------------------------------------------------
@@ -36,17 +35,12 @@ tasks:
   build:release:
     desc: "Build everything in release mode"
     deps: [build:swift:release, build:go]
-    cmds:
-      - cp "{{.SWIFT_BIN_RELEASE}}" "{{.GO_DIR}}/tingly-cu-native"
-      - echo "Copied tingly-cu-native (release) alongside tingly-cu"
 
   build:swift:
     desc: "Build Swift native layer (debug)"
     dir: "{{.SWIFT_DIR}}"
     cmds:
       - swift build --product tingly-cu-native
-      - cp "{{.SWIFT_BIN_DEBUG}}" "{{.GO_DIR}}/tingly-cu-native"
-      - echo "Copied tingly-cu-native (debug) alongside tingly-cu"
     sources:
       - "{{.SWIFT_DIR}}/Sources/**/*.swift"
       - "{{.SWIFT_DIR}}/Package.swift"
@@ -88,23 +82,63 @@ tasks:
   # ---------------------------------------------------------------------------
   # Run
   # ---------------------------------------------------------------------------
-  serve:
-    desc: "Start the Swift gRPC native server on Unix socket"
-    deps: [build:swift]
-    cmds:
-      - "{{.GO_DIR}}/tingly-cu-native serve --socket {{.SOCKET}}"
-
   mcp:
     desc: "Start the Go MCP stdio server (launches Swift server automatically)"
     deps: [build]
+    env:
+      TINGLY_CU_NATIVE: "{{.SWIFT_BIN_DEBUG}}"
     cmds:
+      - kill $(pgrep tingly-cu-native) 2>/dev/null || true
+      - rm -f "{{.SOCKET}}"
       - "{{.GO_BIN}} mcp"
 
   doctor:
     desc: "Check macOS permissions (Accessibility + Screen Recording)"
     deps: [build]
+    env:
+      TINGLY_CU_NATIVE: "{{.SWIFT_BIN_DEBUG}}"
     cmds:
+      - kill $(pgrep tingly-cu-native) 2>/dev/null || true
+      - rm -f "{{.SOCKET}}"
       - "{{.GO_BIN}} doctor"
+
+  list-app:
+    desc: "List all running apps"
+    deps: [build]
+    env:
+      TINGLY_CU_NATIVE: "{{.SWIFT_BIN_DEBUG}}"
+    cmds:
+      - kill $(pgrep tingly-cu-native) 2>/dev/null || true
+      - rm -f "{{.SOCKET}}"
+      - "{{.GO_BIN}} ls-apps"
+
+  ax:
+    desc: "Dump accessibility tree of an app  (e.g. task ax -- Safari)"
+    deps: [build]
+    env:
+      TINGLY_CU_NATIVE: "{{.SWIFT_BIN_DEBUG}}"
+    cmds:
+      - kill $(pgrep tingly-cu-native) 2>/dev/null || true
+      - rm -f "{{.SOCKET}}"
+      - "{{.GO_BIN}} ax {{.CLI_ARGS}}"
+
+  snap:
+    desc: "Screenshot an app window to snap.png  (e.g. task snap -- Safari)"
+    deps: [build]
+    env:
+      TINGLY_CU_NATIVE: "{{.SWIFT_BIN_DEBUG}}"
+    cmds:
+      - kill $(pgrep tingly-cu-native) 2>/dev/null || true
+      - rm -f "{{.SOCKET}}"
+      - "{{.GO_BIN}} snap {{.CLI_ARGS}}"
+
+  serve:
+    desc: "Start the Swift gRPC native server on Unix socket"
+    deps: [build:swift]
+    cmds:
+      - kill $(pgrep tingly-cu-native) 2>/dev/null || true
+      - rm -f "{{.SOCKET}}"
+      - "{{.SWIFT_BIN_DEBUG}} serve --socket {{.SOCKET}}"
 
   # ---------------------------------------------------------------------------
   # Dev helpers
@@ -114,7 +148,6 @@ tasks:
     cmds:
       - rm -rf "{{.SWIFT_DIR}}/.build"
       - rm -f "{{.GO_BIN}}"
-      - rm -f "{{.GO_DIR}}/tingly-cu-native"
       - rm -f "{{.SOCKET}}"
 
   tidy:
