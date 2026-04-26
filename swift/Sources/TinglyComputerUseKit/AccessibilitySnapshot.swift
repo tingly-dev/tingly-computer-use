@@ -19,6 +19,10 @@ public final class AccessibilitySnapshot {
         public let depth: Int
         /// Live AX reference — used for semantic actions (AXPress, setValue, etc.).
         public let axElement: AXUIElement
+        /// Identifier (e.g. "close", "minimize") — shown when no text label is available.
+        public let identifier: String
+        /// Role description (e.g. "close window button") from kAXRoleDescriptionAttribute.
+        public let roleDescription: String
     }
 
     public private(set) var elements: [Element] = []
@@ -65,9 +69,11 @@ public final class AccessibilitySnapshot {
         let label = Self.stringAttr(element, kAXDescriptionAttribute)
             ?? Self.stringAttr(element, kAXTitleAttribute)
             ?? Self.stringAttr(element, kAXLabelValueAttribute)
+            ?? Self.stringAttr(element, kAXHelpAttribute)
             ?? ""
         let value = Self.stringAttr(element, kAXValueAttribute)
         let identifier = Self.stringAttr(element, kAXIdentifierAttribute) ?? ""
+        let roleDescription = Self.stringAttr(element, kAXRoleDescriptionAttribute) ?? ""
 
         // Skip invisible wrappers.
         if isInvisibleWrapper(element: element, role: role, label: label, value: value, identifier: identifier) {
@@ -99,7 +105,9 @@ public final class AccessibilitySnapshot {
             actions: actionNames,
             frame: frame,
             depth: depth,
-            axElement: element
+            axElement: element,
+            identifier: identifier,
+            roleDescription: roleDescription
         )
         elements.append(el)
 
@@ -142,6 +150,12 @@ public final class AccessibilitySnapshot {
             var parts = [el.index, el.role]
             if !el.label.isEmpty {
                 parts.append("\"\(el.label)\"")
+            } else if !el.roleDescription.isEmpty {
+                // Fall back to role description (e.g. "close window button")
+                parts.append("[\(el.roleDescription)]")
+            } else if !el.identifier.isEmpty {
+                // Fall back to identifier (e.g. "close", "minimize")
+                parts.append("[\(el.identifier)]")
             }
             if let v = el.value, !v.isEmpty {
                 parts.append("value=\(v)")
