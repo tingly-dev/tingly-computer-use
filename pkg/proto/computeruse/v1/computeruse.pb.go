@@ -1262,7 +1262,7 @@ const file_computeruse_v1_computeruse_proto_rawDesc = "" +
 	"\x16PerformSecondaryAction\x12-.computeruse.v1.PerformSecondaryActionRequest\x1a\x1e.computeruse.v1.ActionResponse\x12K\n" +
 	"\bSetValue\x12\x1f.computeruse.v1.SetValueRequest\x1a\x1e.computeruse.v1.ActionResponse\x12P\n" +
 	"\tTurnEnded\x12 .computeruse.v1.TurnEndedRequest\x1a!.computeruse.v1.TurnEndedResponse\x12e\n" +
-	"\x10CheckPermissions\x12'.computeruse.v1.CheckPermissionsRequest\x1a(.computeruse.v1.CheckPermissionsResponseBUZSgithub.com/tingly-dev/tingly-computer-use/pkg/proto/computeruse/v1;computerusev1b\x06proto3"
+	"\x10CheckPermissions\x12'.computeruse.v1.CheckPermissionsRequest\x1a(.computeruse.v1.CheckPermissionsResponseBRZPgithub.com/tingly-dev/tingly-computer-use/pkg/proto/computeruse/v1;computerusev1b\x06proto3"
 
 var (
 	file_computeruse_v1_computeruse_proto_rawDescOnce sync.Once

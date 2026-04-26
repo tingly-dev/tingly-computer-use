@@ -16,7 +16,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$SCRIPT_DIR/.."
 PROTO_DIR="$ROOT/proto"
-GO_OUT="$ROOT/go/pkg/proto"
+GO_OUT="$ROOT/pkg/proto"
 SWIFT_OUT="$ROOT/swift/Sources/TinglyComputerUseKit/Generated"
 
 echo "==> Generating Go proto code..."

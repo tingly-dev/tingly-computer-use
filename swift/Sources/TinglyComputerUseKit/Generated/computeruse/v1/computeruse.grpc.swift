@@ -29,7 +29,8 @@ public enum Computeruse_V1_ComputerUseService: Sendable {
             /// Descriptor for "ListApps".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "computeruse.v1.ComputerUseService"),
-                method: "ListApps"
+                method: "ListApps",
+                type: .unary
             )
         }
         /// Namespace for "GetAppState" metadata.
@@ -41,7 +42,8 @@ public enum Computeruse_V1_ComputerUseService: Sendable {
             /// Descriptor for "GetAppState".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "computeruse.v1.ComputerUseService"),
-                method: "GetAppState"
+                method: "GetAppState",
+                type: .unary
             )
         }
         /// Namespace for "Click" metadata.
@@ -53,7 +55,8 @@ public enum Computeruse_V1_ComputerUseService: Sendable {
             /// Descriptor for "Click".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "computeruse.v1.ComputerUseService"),
-                method: "Click"
+                method: "Click",
+                type: .unary
             )
         }
         /// Namespace for "TypeText" metadata.
@@ -65,7 +68,8 @@ public enum Computeruse_V1_ComputerUseService: Sendable {
             /// Descriptor for "TypeText".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "computeruse.v1.ComputerUseService"),
-                method: "TypeText"
+                method: "TypeText",
+                type: .unary
             )
         }
         /// Namespace for "PressKey" metadata.
@@ -77,7 +81,8 @@ public enum Computeruse_V1_ComputerUseService: Sendable {
             /// Descriptor for "PressKey".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "computeruse.v1.ComputerUseService"),
-                method: "PressKey"
+                method: "PressKey",
+                type: .unary
             )
         }
         /// Namespace for "Scroll" metadata.
@@ -89,7 +94,8 @@ public enum Computeruse_V1_ComputerUseService: Sendable {
             /// Descriptor for "Scroll".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "computeruse.v1.ComputerUseService"),
-                method: "Scroll"
+                method: "Scroll",
+                type: .unary
             )
         }
         /// Namespace for "Drag" metadata.
@@ -101,7 +107,8 @@ public enum Computeruse_V1_ComputerUseService: Sendable {
             /// Descriptor for "Drag".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "computeruse.v1.ComputerUseService"),
-                method: "Drag"
+                method: "Drag",
+                type: .unary
             )
         }
         /// Namespace for "PerformSecondaryAction" metadata.
@@ -113,7 +120,8 @@ public enum Computeruse_V1_ComputerUseService: Sendable {
             /// Descriptor for "PerformSecondaryAction".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "computeruse.v1.ComputerUseService"),
-                method: "PerformSecondaryAction"
+                method: "PerformSecondaryAction",
+                type: .unary
             )
         }
         /// Namespace for "SetValue" metadata.
@@ -125,7 +133,8 @@ public enum Computeruse_V1_ComputerUseService: Sendable {
             /// Descriptor for "SetValue".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "computeruse.v1.ComputerUseService"),
-                method: "SetValue"
+                method: "SetValue",
+                type: .unary
             )
         }
         /// Namespace for "TurnEnded" metadata.
@@ -137,7 +146,8 @@ public enum Computeruse_V1_ComputerUseService: Sendable {
             /// Descriptor for "TurnEnded".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "computeruse.v1.ComputerUseService"),
-                method: "TurnEnded"
+                method: "TurnEnded",
+                type: .unary
             )
         }
         /// Namespace for "CheckPermissions" metadata.
@@ -149,7 +159,8 @@ public enum Computeruse_V1_ComputerUseService: Sendable {
             /// Descriptor for "CheckPermissions".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "computeruse.v1.ComputerUseService"),
-                method: "CheckPermissions"
+                method: "CheckPermissions",
+                type: .unary
             )
         }
         /// Descriptors for all methods in the "computeruse.v1.ComputerUseService" service.

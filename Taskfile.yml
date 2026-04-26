@@ -2,7 +2,7 @@ version: "3"
 
 vars:
   ROOT: "{{.TASKFILE_DIR}}"
-  GO_DIR: "{{.ROOT}}/go"
+  GO_DIR: "{{.ROOT}}"
   SWIFT_DIR: "{{.ROOT}}/swift"
   BUILD_DIR: "{{.ROOT}}/build"
   PROTO_DIR: "{{.ROOT}}/proto"

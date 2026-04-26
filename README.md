@@ -87,7 +87,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "tingly-computer-use": {
-      "command": "/absolute/path/to/tingly-computer-use/go/tingly-cu",
+      "command": "/absolute/path/to/tingly-computer-use/tingly-cu",
       "args": ["mcp"],
       "env": {
         "TINGLY_CU_NATIVE": "/absolute/path/to/tingly-computer-use/swift/.build/release/tingly-cu-native"

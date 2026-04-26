@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package computeruse.v1;
 
-option go_package = "github.com/tingly-dev/tingly-computer-use/go/pkg/proto/computeruse/v1;computerusev1";
+option go_package = "github.com/tingly-dev/tingly-computer-use/pkg/proto/computeruse/v1;computerusev1";
 
 // ComputerUseService provides Mac desktop GUI control capabilities.
 // Transport: gRPC over Unix socket (local) or TCP (remote).
