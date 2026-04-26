@@ -14,10 +14,19 @@ public final class ComputerUseGRPCServer {
     public func run() async throws {
         let service = ComputerUseServiceImpl()
 
+        // Local Unix socket — relax client keepalive restrictions so the Go gRPC
+        // client's default HTTP/2 PING frames don't trigger ENHANCE_YOUR_CALM / GOAWAY.
+        var transportConfig = HTTP2ServerTransport.Posix.Config.defaults
+        transportConfig.connection.keepalive.clientBehavior = .init(
+            minPingIntervalWithoutCalls: .seconds(1),
+            allowWithoutCalls: true
+        )
+
         let server = GRPCServer(
             transport: .http2NIOPosix(
                 address: .unixDomainSocket(path: socketPath),
-                transportSecurity: .plaintext
+                transportSecurity: .plaintext,
+                config: transportConfig
             ),
             services: [service]
         )

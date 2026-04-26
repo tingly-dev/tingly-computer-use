@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 
 	pb "github.com/tingly-dev/tingly-computer-use/go/pkg/proto/computeruse/v1"
 )
@@ -97,6 +98,15 @@ func (m *Manager) EnsureRunning(ctx context.Context) error {
 	conn, err := grpc.NewClient(
 		"unix://"+m.cfg.SocketPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		// Local Unix socket — disable keepalive pings and BDP estimation pings to
+		// avoid ENHANCE_YOUR_CALM / GOAWAY errors from the Swift gRPC-NIO server.
+		// Setting InitialConnWindowSize >= defaultWindowSize disables the dynamic
+		// window / BDP estimator which sends unsolicited PING frames.
+		grpc.WithInitialConnWindowSize(1<<20), // 1 MiB — disables BDP ping
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                time.Duration(1<<63 - 1), // effectively disabled
+			PermitWithoutStream: false,
+		}),
 	)
 	if err != nil {
 		return fmt.Errorf("dial native socket: %w", err)
