@@ -6,7 +6,7 @@ import (
 	"math"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	pb "github.com/tingly-dev/tingly-computer-use/go/pkg/proto/computeruse/v1"
+	pb "github.com/tingly-dev/tingly-computer-use/pkg/proto/computeruse/v1"
 )
 
 func (h *Handlers) Click(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

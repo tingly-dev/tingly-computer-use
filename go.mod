@@ -1,4 +1,4 @@
-module github.com/tingly-dev/tingly-computer-use/go
+module github.com/tingly-dev/tingly-computer-use
 
 go 1.23.0
 

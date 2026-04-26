@@ -7,8 +7,8 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/tingly-dev/tingly-computer-use/go/internal/bridge"
-	"github.com/tingly-dev/tingly-computer-use/go/internal/tools"
+	"github.com/tingly-dev/tingly-computer-use/internal/bridge"
+	"github.com/tingly-dev/tingly-computer-use/internal/tools"
 )
 
 // Server is the MCP stdio server.

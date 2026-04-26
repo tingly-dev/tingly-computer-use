@@ -17,8 +17,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/tingly-dev/tingly-computer-use/go/internal/obs"
-	pb "github.com/tingly-dev/tingly-computer-use/go/pkg/proto/computeruse/v1"
+	"github.com/tingly-dev/tingly-computer-use/internal/obs"
+	pb "github.com/tingly-dev/tingly-computer-use/pkg/proto/computeruse/v1"
 )
 
 const (

@@ -2,7 +2,7 @@
 package tools
 
 import (
-	"github.com/tingly-dev/tingly-computer-use/go/internal/bridge"
+	"github.com/tingly-dev/tingly-computer-use/internal/bridge"
 )
 
 // Handlers holds all tool handler methods.

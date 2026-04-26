@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/tingly-dev/tingly-computer-use/go/internal/bridge"
-	"github.com/tingly-dev/tingly-computer-use/go/internal/mcpserver"
-	"github.com/tingly-dev/tingly-computer-use/go/internal/obs"
+	"github.com/tingly-dev/tingly-computer-use/internal/bridge"
+	"github.com/tingly-dev/tingly-computer-use/internal/mcpserver"
+	"github.com/tingly-dev/tingly-computer-use/internal/obs"
 )
 
 const version = "0.1.0"

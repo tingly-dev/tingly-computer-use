@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	pb "github.com/tingly-dev/tingly-computer-use/go/pkg/proto/computeruse/v1"
+	pb "github.com/tingly-dev/tingly-computer-use/pkg/proto/computeruse/v1"
 )
 
 // Client wraps the generated gRPC stub with ergonomic helpers.
