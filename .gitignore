@@ -4,8 +4,8 @@ swift/.build
 .task
 
 # Build artifacts (do not commit)
-/go/tingly-cu
-/go/tingly-cu-native
+/tingly-cu
+/tingly-cu-native
 /snap.png
 
 # Git ignore file
