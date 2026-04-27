@@ -1,0 +1,68 @@
+name: Release
+
+# Tag-triggered release: build macOS arm64 binaries, package as tarball,
+# attach to a GitHub Release. See .sdlc/docs/release-github-ci-20260427.spec.md.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write   # required by `gh release create`
+
+jobs:
+  release:
+    name: Build and publish macOS arm64 release
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Install Task
+        run: brew install go-task
+
+      - name: Verify toolchain
+        run: |
+          swift --version
+          go version
+          task --version
+
+      - name: Build release binaries
+        env:
+          GOWORK: 'off'
+        run: task release
+
+      - name: Package tarball
+        id: pack
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          NAME="tingly-cu-${VERSION}-macos-arm64"
+          STAGE="out/${NAME}"
+          mkdir -p "${STAGE}"
+          cp dist/tingly-cu          "${STAGE}/"
+          cp dist/tingly-cu-native   "${STAGE}/"
+          cp LICENSE README.md       "${STAGE}/"
+          tar -C out -czf "out/${NAME}.tar.gz" "${NAME}"
+          (cd out && shasum -a 256 "${NAME}.tar.gz" > "${NAME}.tar.gz.sha256")
+          echo "tarball=out/${NAME}.tar.gz" >> "${GITHUB_OUTPUT}"
+          echo "sha=out/${NAME}.tar.gz.sha256" >> "${GITHUB_OUTPUT}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            "${{ steps.pack.outputs.tarball }}" \
+            "${{ steps.pack.outputs.sha }}"

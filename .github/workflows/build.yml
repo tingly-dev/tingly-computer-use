@@ -1,0 +1,70 @@
+name: Build
+
+# Verify the project builds on every push to main and every PR.
+# Release packaging lives in release.yml.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.go'
+      - '**.swift'
+      - 'go.mod'
+      - 'go.sum'
+      - 'swift/Package.*'
+      - 'proto/**'
+      - 'Taskfile.yml'
+      - '.github/workflows/build.yml'
+  pull_request:
+    paths:
+      - '**.go'
+      - '**.swift'
+      - 'go.mod'
+      - 'go.sum'
+      - 'swift/Package.*'
+      - 'proto/**'
+      - 'Taskfile.yml'
+      - '.github/workflows/build.yml'
+
+# Cancel superseded runs on the same ref (e.g. PR force-pushes).
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (macOS arm64, debug)
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Install Task
+        run: brew install go-task
+
+      - name: Verify toolchain
+        run: |
+          swift --version
+          go version
+          task --version
+
+      - name: go vet
+        env:
+          GOWORK: 'off'
+        run: go vet ./...
+
+      - name: Build (debug)
+        env:
+          GOWORK: 'off'
+        run: task build
