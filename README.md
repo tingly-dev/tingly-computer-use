@@ -50,6 +50,38 @@ These actions are deliberately collapsed into the existing surface rather than e
 
 Run `task doctor` to check both at once.
 
+## Download (pre-built binaries)
+
+Each tagged release publishes a macOS arm64 (Apple Silicon) tarball on the [Releases page](../../releases). If you just want to run the MCP server, download instead of building:
+
+```bash
+# Replace VERSION with the tag you want (e.g. 1.0.0)
+VERSION=1.0.0
+NAME="tingly-cu-${VERSION}-macos-arm64"
+
+curl -LO "https://github.com/<owner>/<repo>/releases/download/v${VERSION}/${NAME}.tar.gz"
+curl -LO "https://github.com/<owner>/<repo>/releases/download/v${VERSION}/${NAME}.tar.gz.sha256"
+shasum -a 256 -c "${NAME}.tar.gz.sha256"     # verify integrity
+tar -xzf "${NAME}.tar.gz"
+
+# The two binaries sit side-by-side, so the Go wrapper auto-discovers the
+# native bridge — no TINGLY_CU_NATIVE env required.
+./${NAME}/tingly-cu doctor
+```
+
+Point your MCP client at `<extracted-dir>/tingly-cu` (see [MCP client configuration](#mcp-client-configuration) below).
+
+> **First run on macOS — Gatekeeper notice**
+>
+> The release binaries are **not codesigned or notarized**. The first time you run them, macOS will refuse with "Apple cannot check it for malicious software". Bypass once:
+>
+> - **Finder**: right-click `tingly-cu` (and `tingly-cu-native`) → **Open** → confirm in the dialog. Subsequent runs are unrestricted.
+> - **Or via terminal**: `xattr -d com.apple.quarantine tingly-cu tingly-cu-native`.
+>
+> If you prefer signed binaries, build from source — `task release` produces unquarantined binaries directly.
+
+Architectures other than arm64 (Intel x86_64, etc.) are not currently published. Build from source via the [Build](#build) section if you need them.
+
 ## Build
 
 ```bash
