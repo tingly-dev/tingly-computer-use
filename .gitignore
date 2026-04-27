@@ -6,6 +6,7 @@ swift/.build
 # Build artifacts (do not commit)
 /tingly-cu
 /tingly-cu-native
+/dist/
 /snap.png
 
 # Git ignore file

@@ -14,12 +14,13 @@ A macOS computer-use toolkit for AI agents. Exposes screen capture, accessibilit
 
 ## What it can do
 
-The Go CLI registers ten MCP tools:
+The Go CLI registers eleven MCP tools:
 
 | Tool                       | Purpose                                                          |
 |---------------------------|------------------------------------------------------------------|
 | `list_apps`               | List running + recently used apps (last 14 days, deny-listed apps filtered) |
 | `get_app_state`           | Focus the app's key window, return PNG screenshot + accessibility tree (must be called once per turn) |
+| `snapshot`                | **Read-only** PNG + AX tree of an already-running app — never launches, activates, or reopens; fails if the app is not running |
 | `click`                   | Click by `element_index` from the AX tree, or by screenshot pixel coords |
 | `type_text`               | Type literal Unicode text (per-grapheme keyDown/keyUp pairs)     |
 | `press_key`               | Press a key combo in xdotool syntax (`Return`, `super+c`, …)     |
@@ -28,6 +29,15 @@ The Go CLI registers ten MCP tools:
 | `perform_secondary_action`| Invoke a non-default AX action (e.g. `AXShowMenu`)               |
 | `set_value`               | Set the value of a settable AX element                           |
 | `turn_ended`              | Clear per-turn snapshot cache (host signals end of agent turn)   |
+
+### Why no `open_app` / dedicated `close_app` tools?
+
+These actions are deliberately collapsed into the existing surface rather than exposed as separate tools:
+
+- **Open / launch** is folded into `get_app_state`: passing an `app` that is not running causes the native side to launch and activate it, then snapshot — one round-trip instead of two, and no race between launch and capture.
+- **Snapshot vs `get_app_state`**: use `snapshot` when you only want to *observe* an app the user already has open (no focus stealing, no launching). Use `get_app_state` when you intend to *act* on the app and need it focused.
+- **Close / quit** is intentionally not exposed: terminating other processes is high-risk. The agent can dismiss windows or quit gracefully via `press_key` (`super+w` / `super+q`), which is auditable by the host and still subject to the deny list.
+
 
 ## Requirements
 
@@ -43,26 +53,28 @@ Run `task doctor` to check both at once.
 ## Build
 
 ```bash
-# Build Swift native server (debug) + Go CLI
+# Build Swift native server (debug) + Go CLI in place (for `task mcp` dev loop)
 task build
 
-# Release build
+# Release build of both binaries, in place
 task build:release
 
-# Or directly:
-cd swift && swift build --product tingly-cu-native -c release
-cd go    && GOWORK=off go build -o tingly-cu ./cmd/tingly-cu
+# Release build + copy both binaries side-by-side into ./dist
+# (this is what MCP clients should point at — see "MCP client configuration")
+task release
 ```
 
 Build outputs:
 
-- `swift/.build/{debug,release}/tingly-cu-native`
-- `go/tingly-cu`
+- `task build` / `build:release` → `swift/.build/{debug,release}/tingly-cu-native`, `./tingly-cu`
+- `task release` → `dist/tingly-cu`, `dist/tingly-cu-native`
 
 The Go binary auto-locates `tingly-cu-native` via, in order:
 1. `TINGLY_CU_NATIVE` env var
 2. Same directory as the Go binary
 3. `$PATH`
+
+`dist/` puts the two binaries in the same directory, so step 2 fires and **no env var is needed** in MCP client configs.
 
 ## Run
 
@@ -79,27 +91,81 @@ task snap   -- Safari      # Save screenshot to ./snap.png
 
 ## MCP client configuration
 
-### Claude Desktop / Claude Code
+`tingly-cu mcp` is a standard **MCP stdio server** (JSON-RPC 2.0 over stdin/stdout). Any MCP-capable host can use it by spawning the binary with `mcp` as its only argument.
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+**Set up once:**
+
+```bash
+task release                # builds release binaries into ./dist
+./dist/tingly-cu doctor     # must report OK on Accessibility + Screen Recording
+```
+
+`task release` co-locates `tingly-cu` and `tingly-cu-native` under `dist/`, so the Go wrapper auto-discovers the native bridge — **MCP configs only need to point at `dist/tingly-cu`, no `TINGLY_CU_NATIVE` env required**.
+
+Grant the two macOS permissions to **the host process that will spawn `tingly-cu`** (e.g. Claude Desktop.app, your terminal, VS Code), not to `tingly-cu` itself — macOS attributes the access to the parent.
+
+In every example below, replace `/abs/path/to/tingly-computer-use/` with your actual absolute path to the repo.
+
+### Claude Desktop
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "tingly-computer-use": {
-      "command": "/absolute/path/to/tingly-computer-use/tingly-cu",
-      "args": ["mcp"],
-      "env": {
-        "TINGLY_CU_NATIVE": "/absolute/path/to/tingly-computer-use/swift/.build/release/tingly-cu-native"
-      }
+      "command": "/abs/path/to/tingly-computer-use/dist/tingly-cu",
+      "args": ["mcp"]
     }
   }
 }
 ```
 
-### Codex / opencode / Gemini CLI
+Restart Claude Desktop. The tools appear under the 🔨 menu; if not, check `~/Library/Logs/Claude/mcp*.log`.
 
-Any MCP client that speaks stdio works the same way: invoke `tingly-cu mcp`, passing the `TINGLY_CU_NATIVE` env if the native binary isn't on `$PATH` next to the Go binary.
+### Claude Code (CLI)
+
+```bash
+claude mcp add tingly-computer-use \
+  -- /abs/path/to/tingly-computer-use/dist/tingly-cu mcp
+
+claude mcp list                 # verify it shows up
+```
+
+Use `--scope user` to register globally instead of per-project.
+
+### Codex CLI
+
+Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.tingly-computer-use]
+command = "/abs/path/to/tingly-computer-use/dist/tingly-cu"
+args = ["mcp"]
+```
+
+### Cursor / Cline / Continue / opencode / Gemini CLI
+
+These hosts all accept the same stdio shape — only the config file path differs:
+
+- Cursor: `~/.cursor/mcp.json` (or project-level `.cursor/mcp.json`)
+- Cline (VS Code): `cline_mcp_settings.json` via the Cline panel
+- Continue: `~/.continue/config.json` under `experimental.modelContextProtocolServers`
+- opencode: `~/.config/opencode/config.json`
+- Gemini CLI: `~/.gemini/settings.json` under `mcpServers`
+
+Use the same `command` + `args` pair shown for Claude Desktop above.
+
+### Verify the connection
+
+From any client, calling `list_apps` should return the running app list. If a call hangs or returns "native bridge not available":
+
+1. Re-run `./dist/tingly-cu doctor` — permission revocations are silent.
+2. Confirm `dist/tingly-cu-native` exists next to `dist/tingly-cu` (re-run `task release` if not).
+3. Tail the host's MCP log, or run the server directly to see structured errors:
+   ```bash
+   TINGLY_CU_LOG_FORMAT=text TINGLY_CU_LOG_LEVEL=debug ./dist/tingly-cu mcp </dev/null
+   ```
 
 ## Configuration (env vars)
 

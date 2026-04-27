@@ -12,6 +12,13 @@ vars:
   SWIFT_BIN_DEBUG: "{{.SWIFT_DIR}}/.build/debug/tingly-cu-native"
   SWIFT_BIN_RELEASE: "{{.SWIFT_DIR}}/.build/release/tingly-cu-native"
 
+  # Distribution directory: self-contained release binaries that MCP clients
+  # can point at directly. Both binaries sit side-by-side so the Go wrapper
+  # auto-discovers the native bridge (no TINGLY_CU_NATIVE env needed).
+  DIST_DIR: "{{.ROOT}}/dist"
+  DIST_GO_BIN: "{{.DIST_DIR}}/tingly-cu"
+  DIST_SWIFT_BIN: "{{.DIST_DIR}}/tingly-cu-native"
+
   # Socket path for local dev — evaluated at runtime via shell expansion
   SOCKET:
     sh: echo "/tmp/tingly-cu-$(id -u).sock"
@@ -35,6 +42,29 @@ tasks:
   build:release:
     desc: "Build everything in release mode"
     deps: [build:swift:release, build:go]
+
+  release:
+    desc: "Build release binaries into ./dist (point MCP clients at dist/tingly-cu)"
+    deps: [build:release]
+    cmds:
+      - mkdir -p "{{.DIST_DIR}}"
+      - cp -f "{{.SWIFT_BIN_RELEASE}}" "{{.DIST_SWIFT_BIN}}"
+      - cp -f "{{.GO_BIN}}" "{{.DIST_GO_BIN}}"
+      - |
+        echo
+        echo "Release binaries ready:"
+        echo "  {{.DIST_GO_BIN}}"
+        echo "  {{.DIST_SWIFT_BIN}}"
+        echo
+        echo "MCP client config:"
+        echo "  command: {{.DIST_GO_BIN}}"
+        echo "  args:    [\"mcp\"]"
+    sources:
+      - "{{.GO_BIN}}"
+      - "{{.SWIFT_BIN_RELEASE}}"
+    generates:
+      - "{{.DIST_GO_BIN}}"
+      - "{{.DIST_SWIFT_BIN}}"
 
   build:swift:
     desc: "Build Swift native layer (debug)"
@@ -148,6 +178,7 @@ tasks:
     cmds:
       - rm -rf "{{.SWIFT_DIR}}/.build"
       - rm -f "{{.GO_BIN}}"
+      - rm -rf "{{.DIST_DIR}}"
       - rm -f "{{.SOCKET}}"
 
   tidy:
