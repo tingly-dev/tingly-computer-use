@@ -68,6 +68,20 @@ func registerTools(srv *server.MCPServer, h *tools.Handlers) {
 		},
 	)
 
+	srv.AddTool(
+		mcp.NewTool("snapshot",
+			mcp.WithDescription("Capture a strictly read-only snapshot of an app's key window: returns its current accessibility tree and screenshot. Unlike get_app_state, this never launches, activates, or reopens the app — if the app is not currently running, the call fails. Use this to passively observe state without interrupting the user's foreground work."),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithString("app",
+				mcp.Required(),
+				mcp.Description("App name or bundle identifier (must already be running)"),
+			),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return h.Snapshot(ctx, req)
+		},
+	)
+
 	// ── Action tools ─────────────────────────────────────────────────────────
 
 	srv.AddTool(

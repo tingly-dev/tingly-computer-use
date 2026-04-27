@@ -58,8 +58,15 @@ func (c *Client) ListApps(ctx context.Context) ([]AppInfo, error) {
 	return apps, nil
 }
 
-func (c *Client) GetAppState(ctx context.Context, app string) (*AppStateResult, error) {
-	resp, err := c.stub.GetAppState(ctx, &pb.GetAppStateRequest{App: app})
+// GetAppState fetches a screenshot + accessibility tree for the app's key window.
+// When snapshotOnly is true, the call is strictly read-only: the native side
+// will not launch, activate, or reopen the app, and returns NOT_FOUND if the
+// app is not currently running.
+func (c *Client) GetAppState(ctx context.Context, app string, snapshotOnly bool) (*AppStateResult, error) {
+	resp, err := c.stub.GetAppState(ctx, &pb.GetAppStateRequest{
+		App:          app,
+		SnapshotOnly: snapshotOnly,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("GetAppState(%q): %w", app, err)
 	}

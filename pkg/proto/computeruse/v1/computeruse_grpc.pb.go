@@ -43,6 +43,10 @@ type ComputerUseServiceClient interface {
 	ListApps(ctx context.Context, in *ListAppsRequest, opts ...grpc.CallOption) (*ListAppsResponse, error)
 	// Get the accessibility tree and screenshot of an app's key window.
 	// Must be called once per agent turn before interacting with the app.
+	//
+	// When `snapshot_only` is true, the call is strictly read-only:
+	// the app is never launched, activated, or reopened, and a
+	// NOT_FOUND error is returned if it is not currently running.
 	GetAppState(ctx context.Context, in *GetAppStateRequest, opts ...grpc.CallOption) (*GetAppStateResponse, error)
 	// Click an element by index or pixel coordinates from screenshot.
 	Click(ctx context.Context, in *ClickRequest, opts ...grpc.CallOption) (*ActionResponse, error)
@@ -193,6 +197,10 @@ type ComputerUseServiceServer interface {
 	ListApps(context.Context, *ListAppsRequest) (*ListAppsResponse, error)
 	// Get the accessibility tree and screenshot of an app's key window.
 	// Must be called once per agent turn before interacting with the app.
+	//
+	// When `snapshot_only` is true, the call is strictly read-only:
+	// the app is never launched, activated, or reopened, and a
+	// NOT_FOUND error is returned if it is not currently running.
 	GetAppState(context.Context, *GetAppStateRequest) (*GetAppStateResponse, error)
 	// Click an element by index or pixel coordinates from screenshot.
 	Click(context.Context, *ClickRequest) (*ActionResponse, error)

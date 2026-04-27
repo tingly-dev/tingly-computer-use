@@ -164,7 +164,7 @@ func runListApps() error {
 
 func runAX(app string) error {
 	return withBridge(func(ctx context.Context, c *bridge.Client) error {
-		state, err := c.GetAppState(ctx, app)
+		state, err := c.GetAppState(ctx, app, false)
 		if err != nil {
 			return err
 		}
@@ -175,7 +175,7 @@ func runAX(app string) error {
 
 func runSnap(app, outPath string) error {
 	return withBridge(func(ctx context.Context, c *bridge.Client) error {
-		state, err := c.GetAppState(ctx, app)
+		state, err := c.GetAppState(ctx, app, false)
 		if err != nil {
 			return err
 		}

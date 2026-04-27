@@ -20,9 +20,12 @@ public struct AppStateSnapshot {
 /// Builds an AppStateSnapshot by running AX traversal and screenshot concurrently.
 public enum AppSnapshotBuilder {
 
-    public static func build(pid: pid_t, app: String) async throws -> AppStateSnapshot {
+    public static func build(pid: pid_t, app: String, focus: Bool = true) async throws -> AppStateSnapshot {
         // Ensure the app has a visible, focused window before snapshotting.
-        try await focusWindow(pid: pid)
+        // Skipped when `focus` is false (read-only snapshot path).
+        if focus {
+            try await focusWindow(pid: pid)
+        }
 
         // Run AX snapshot and screenshot truly concurrently.
         async let axResult = buildAX(pid: pid, app: app)

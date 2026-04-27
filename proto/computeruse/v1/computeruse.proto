@@ -12,6 +12,10 @@ service ComputerUseService {
 
   // Get the accessibility tree and screenshot of an app's key window.
   // Must be called once per agent turn before interacting with the app.
+  //
+  // When `snapshot_only` is true, the call is strictly read-only:
+  // the app is never launched, activated, or reopened, and a
+  // NOT_FOUND error is returned if it is not currently running.
   rpc GetAppState(GetAppStateRequest) returns (GetAppStateResponse);
 
   // Click an element by index or pixel coordinates from screenshot.
@@ -63,6 +67,11 @@ message AppInfo {
 message GetAppStateRequest {
   // App name or bundle identifier.
   string app = 1;
+
+  // If true, never launch, activate, or reopen the app.
+  // The server returns NOT_FOUND if the app is not currently running,
+  // and skips the focus/raise step before snapshotting.
+  bool snapshot_only = 2;
 }
 
 message GetAppStateResponse {

@@ -280,7 +280,11 @@ func (x *AppInfo) GetDaysSinceUsed() int32 {
 type GetAppStateRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// App name or bundle identifier.
-	App           string `protobuf:"bytes,1,opt,name=app,proto3" json:"app,omitempty"`
+	App string `protobuf:"bytes,1,opt,name=app,proto3" json:"app,omitempty"`
+	// If true, never launch, activate, or reopen the app.
+	// The server returns NOT_FOUND if the app is not currently running,
+	// and skips the focus/raise step before snapshotting.
+	SnapshotOnly  bool `protobuf:"varint,2,opt,name=snapshot_only,json=snapshotOnly,proto3" json:"snapshot_only,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -320,6 +324,13 @@ func (x *GetAppStateRequest) GetApp() string {
 		return x.App
 	}
 	return ""
+}
+
+func (x *GetAppStateRequest) GetSnapshotOnly() bool {
+	if x != nil {
+		return x.SnapshotOnly
+	}
+	return false
 }
 
 type GetAppStateResponse struct {
@@ -1181,9 +1192,10 @@ const file_computeruse_v1_computeruse_proto_rawDesc = "" +
 	"\tbundle_id\x18\x02 \x01(\tR\bbundleId\x12\x1d\n" +
 	"\n" +
 	"is_running\x18\x03 \x01(\bR\tisRunning\x12&\n" +
-	"\x0fdays_since_used\x18\x04 \x01(\x05R\rdaysSinceUsed\"&\n" +
+	"\x0fdays_since_used\x18\x04 \x01(\x05R\rdaysSinceUsed\"K\n" +
 	"\x12GetAppStateRequest\x12\x10\n" +
-	"\x03app\x18\x01 \x01(\tR\x03app\"\xda\x01\n" +
+	"\x03app\x18\x01 \x01(\tR\x03app\x12#\n" +
+	"\rsnapshot_only\x18\x02 \x01(\bR\fsnapshotOnly\"\xda\x01\n" +
 	"\x13GetAppStateResponse\x12-\n" +
 	"\x12accessibility_tree\x18\x01 \x01(\tR\x11accessibilityTree\x12%\n" +
 	"\x0escreenshot_png\x18\x02 \x01(\fR\rscreenshotPng\x122\n" +

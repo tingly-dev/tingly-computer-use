@@ -230,6 +230,10 @@ extension Computeruse_V1_ComputerUseService {
         /// >
         /// > Get the accessibility tree and screenshot of an app's key window.
         /// > Must be called once per agent turn before interacting with the app.
+        /// > 
+        /// > When `snapshot_only` is true, the call is strictly read-only:
+        /// > the app is never launched, activated, or reopened, and a
+        /// > NOT_FOUND error is returned if it is not currently running.
         ///
         /// - Parameters:
         ///   - request: A streaming request of `Computeruse_V1_GetAppStateRequest` messages.
@@ -443,6 +447,10 @@ extension Computeruse_V1_ComputerUseService {
         /// >
         /// > Get the accessibility tree and screenshot of an app's key window.
         /// > Must be called once per agent turn before interacting with the app.
+        /// > 
+        /// > When `snapshot_only` is true, the call is strictly read-only:
+        /// > the app is never launched, activated, or reopened, and a
+        /// > NOT_FOUND error is returned if it is not currently running.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Computeruse_V1_GetAppStateRequest` message.
@@ -654,6 +662,10 @@ extension Computeruse_V1_ComputerUseService {
         /// >
         /// > Get the accessibility tree and screenshot of an app's key window.
         /// > Must be called once per agent turn before interacting with the app.
+        /// > 
+        /// > When `snapshot_only` is true, the call is strictly read-only:
+        /// > the app is never launched, activated, or reopened, and a
+        /// > NOT_FOUND error is returned if it is not currently running.
         ///
         /// - Parameters:
         ///   - request: A `Computeruse_V1_GetAppStateRequest` message.
@@ -1274,6 +1286,10 @@ extension Computeruse_V1_ComputerUseService {
         /// >
         /// > Get the accessibility tree and screenshot of an app's key window.
         /// > Must be called once per agent turn before interacting with the app.
+        /// > 
+        /// > When `snapshot_only` is true, the call is strictly read-only:
+        /// > the app is never launched, activated, or reopened, and a
+        /// > NOT_FOUND error is returned if it is not currently running.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Computeruse_V1_GetAppStateRequest` message.
@@ -1561,6 +1577,10 @@ extension Computeruse_V1_ComputerUseService {
         /// >
         /// > Get the accessibility tree and screenshot of an app's key window.
         /// > Must be called once per agent turn before interacting with the app.
+        /// > 
+        /// > When `snapshot_only` is true, the call is strictly read-only:
+        /// > the app is never launched, activated, or reopened, and a
+        /// > NOT_FOUND error is returned if it is not currently running.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Computeruse_V1_GetAppStateRequest` message.
@@ -1936,6 +1956,10 @@ extension Computeruse_V1_ComputerUseService.ClientProtocol {
     /// >
     /// > Get the accessibility tree and screenshot of an app's key window.
     /// > Must be called once per agent turn before interacting with the app.
+    /// > 
+    /// > When `snapshot_only` is true, the call is strictly read-only:
+    /// > the app is never launched, activated, or reopened, and a
+    /// > NOT_FOUND error is returned if it is not currently running.
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Computeruse_V1_GetAppStateRequest` message.
@@ -2264,6 +2288,10 @@ extension Computeruse_V1_ComputerUseService.ClientProtocol {
     /// >
     /// > Get the accessibility tree and screenshot of an app's key window.
     /// > Must be called once per agent turn before interacting with the app.
+    /// > 
+    /// > When `snapshot_only` is true, the call is strictly read-only:
+    /// > the app is never launched, activated, or reopened, and a
+    /// > NOT_FOUND error is returned if it is not currently running.
     ///
     /// - Parameters:
     ///   - message: request message to send.

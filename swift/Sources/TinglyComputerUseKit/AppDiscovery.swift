@@ -114,6 +114,14 @@ public final class AppDiscovery {
         }
     }
 
+    // MARK: - Read-only lookup
+
+    /// Returns the PID of the running app matching `app`, or nil if it is not running.
+    /// Never launches, activates, or reopens. Honors the deny list.
+    public func findRunningPID(app: String) -> pid_t? {
+        findRunning(app: app)
+    }
+
     // MARK: - Private
 
     private func findRunning(app: String) -> pid_t? {

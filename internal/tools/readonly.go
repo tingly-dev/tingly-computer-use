@@ -32,7 +32,31 @@ func (h *Handlers) GetAppState(ctx context.Context, req mcp.CallToolRequest) (*m
 		return mcp.NewToolResultError("missing required parameter: app"), nil
 	}
 
-	result, err := h.client.GetAppState(ctx, app)
+	result, err := h.client.GetAppState(ctx, app, false)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	contents := []mcp.Content{
+		mcp.NewTextContent(result.AccessibilityTree),
+	}
+	if len(result.ScreenshotPNG) > 0 {
+		contents = append(contents, mcp.NewImageContent(result.ScreenshotB64, "image/png"))
+	}
+	return &mcp.CallToolResult{Content: contents}, nil
+}
+
+// Snapshot is a strictly read-only variant of GetAppState: it never launches,
+// activates, or reopens the app. If the app is not currently running, the call
+// fails. Use it to passively observe state without disturbing the user.
+func (h *Handlers) Snapshot(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args, _ := req.Params.Arguments.(map[string]any)
+	app, _ := args["app"].(string)
+	if app == "" {
+		return mcp.NewToolResultError("missing required parameter: app"), nil
+	}
+
+	result, err := h.client.GetAppState(ctx, app, true)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}

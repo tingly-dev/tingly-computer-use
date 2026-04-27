@@ -162,6 +162,11 @@ public struct Computeruse_V1_GetAppStateRequest: Sendable {
   /// App name or bundle identifier.
   public var app: String = String()
 
+  /// If true, never launch, activate, or reopen the app.
+  /// The server returns NOT_FOUND if the app is not currently running,
+  /// and skips the focus/raise step before snapshotting.
+  public var snapshotOnly: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -528,7 +533,7 @@ extension Computeruse_V1_AppInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 
 extension Computeruse_V1_GetAppStateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetAppStateRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}app\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}app\0\u{3}snapshot_only\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -537,6 +542,7 @@ extension Computeruse_V1_GetAppStateRequest: SwiftProtobuf.Message, SwiftProtobu
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.app) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.snapshotOnly) }()
       default: break
       }
     }
@@ -546,11 +552,15 @@ extension Computeruse_V1_GetAppStateRequest: SwiftProtobuf.Message, SwiftProtobu
     if !self.app.isEmpty {
       try visitor.visitSingularStringField(value: self.app, fieldNumber: 1)
     }
+    if self.snapshotOnly != false {
+      try visitor.visitSingularBoolField(value: self.snapshotOnly, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Computeruse_V1_GetAppStateRequest, rhs: Computeruse_V1_GetAppStateRequest) -> Bool {
     if lhs.app != rhs.app {return false}
+    if lhs.snapshotOnly != rhs.snapshotOnly {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
