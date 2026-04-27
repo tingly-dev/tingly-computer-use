@@ -17,7 +17,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/grpc/grpc-swift-nio-transport.git",
-            from: "2.0.0"
+            "2.0.0"..<"2.5.0"
         ),
         .package(
             url: "https://github.com/grpc/grpc-swift-protobuf.git",
